@@ -1,16 +1,24 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.detection_logic import generate_alerts
+from app.detection_logic import (
+    generate_alerts,
+    check_expiry,
+    check_old_stock,
+    generate_all_alerts
+)
+
 from app.detection_data import (
-    detected_products_normal,
     detected_products_missing,
-    detected_products_wrong
+    detected_products_wrong,
+    detected_products_normal
 )
 
 app = FastAPI(title="StoreVision AI Backend")
 
-#  CORS CONFIG
+# ----------------------------
+# CORS
+# ----------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -28,7 +36,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#  PRODUCT DATA
+# ----------------------------
+# PRODUCT DATA
+# ----------------------------
 products = [
     {"id": 1, "name": "Lays", "category": "Snacks", "slot": "A1", "expiry_date": "2026-07-20", "status": "available"},
     {"id": 2, "name": "Oreo", "category": "Biscuits", "slot": "A2", "expiry_date": "2026-08-10", "status": "available"},
@@ -37,7 +47,9 @@ products = [
     {"id": 5, "name": "Dairy Milk", "category": "Chocolate", "slot": "A5", "expiry_date": "2026-07-15", "status": "available"},
 ]
 
-#  EXPECTED SHELF (GROUND TRUTH)
+# ----------------------------
+# SHELF TRUTH
+# ----------------------------
 shelf_layout = {
     "A1": "Lays",
     "A2": "Oreo",
@@ -46,17 +58,17 @@ shelf_layout = {
     "A5": "Dairy Milk"
 }
 
-#  ROOT
+# ----------------------------
+# ROUTES
+# ----------------------------
 @app.get("/")
 def home():
     return {"message": "StoreVision AI backend is running"}
 
-#  HEALTH CHECK
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-#  PRODUCTS API
 @app.get("/products")
 def get_products():
     return {
@@ -64,23 +76,47 @@ def get_products():
         "products": products
     }
 
-#  SHELF LAYOUT API
 @app.get("/shelf-layout")
 def get_shelf():
     return shelf_layout
 
-#  ALERTS (MAIN API - DAY 6 CORE)
+# ----------------------------
+# MAIN ALERT ENGINE
+# ----------------------------
 @app.get("/alerts")
 def get_alerts():
-    alerts = generate_alerts(detected_products_missing)
+    all_alerts = generate_all_alerts(detected_products_missing, products)
+
+    # 🔥 FAKE VISUAL TEST ALERTS (TEMPORARY)
+    fake_alerts = [
+        {
+            "type": "expired_product",
+            "severity": "critical",
+            "slot": "A5",
+            "message": "Dairy Milk is EXPIRED (TEST ALERT)"
+        },
+        {
+            "type": "near_expiry",
+            "severity": "low",
+            "slot": "A3",
+            "message": "Coke expires in 2 days (TEST ALERT)"
+        },
+        {
+            "type": "old_stock",
+            "severity": "low",
+            "slot": "A1",
+            "message": "Lays has been on shelf too long (TEST ALERT)"
+        }
+    ]
 
     return {
-        "total_alerts": len(alerts),
-        "alerts": alerts
+        "total_alerts": len(all_alerts + fake_alerts),
+        "alerts": all_alerts + fake_alerts
     }
 
-#  TEST ROUTES (VERY USEFUL FOR DEBUGGING)
-
+# ----------------------------
+# DEBUG ROUTES
+# ----------------------------
 @app.get("/alerts/normal")
 def alerts_normal():
     return {
@@ -88,14 +124,12 @@ def alerts_normal():
         "alerts": generate_alerts(detected_products_normal)
     }
 
-
 @app.get("/alerts/missing")
 def alerts_missing():
     return {
         "mode": "missing",
         "alerts": generate_alerts(detected_products_missing)
     }
-
 
 @app.get("/alerts/wrong")
 def alerts_wrong():

@@ -15,6 +15,12 @@ function App() {
     checkBackend();
     fetchProducts();
     fetchAlerts();
+
+    const interval = setInterval(() => {
+      fetchAlerts();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // ----------------------------
@@ -61,6 +67,7 @@ function App() {
   // ----------------------------
   return (
     <div className="app">
+
       {/* HEADER */}
       <header className="header">
         <h1>StoreVision AI</h1>
@@ -69,34 +76,40 @@ function App() {
         </div>
       </header>
 
-      {/* DASHBOARD SUMMARY */}
-    <div className="summary-grid">
+      {/* SUMMARY */}
+      <div className="summary-grid">
 
-       <div className="summary-card">
-         <h3>Total Items in Store</h3>
-         <strong>{products.length}</strong>
-       </div>
+        <div className="summary-card">
+          <h3>Total Items in Store</h3>
+          <strong>{products.length}</strong>
+        </div>
 
-       <div className="summary-card">
-         <h3>Active Alerts</h3>
-         <strong>{alerts.length}</strong>
+        <div className="summary-card">
+          <h3>Active Alerts</h3>
+          <strong>{alerts.length}</strong>
+        </div>
 
-        <details className="alerts-dropdown">
-          <summary>View Alert Details</summary>
+        <div className="summary-card">
+          <h3>Status</h3>
+          <strong>Live</strong>
+        </div>
 
-          {alerts.length === 0 ? (
-            <p>No active alerts</p>
-          ) : (
-            alerts.map((alert, index) => (
-              <div key={index} className="alert-item">
-                 {alert.message}
-              </div>
-            ))
-       )}
-    </details>
-  </div>
+      </div>
 
-</div>
+      {/* ALERTS */}
+      <details className="alerts-dropdown">
+        <summary>View Alert Details</summary>
+
+        {alerts.length === 0 ? (
+          <p>No active alerts</p>
+        ) : (
+          alerts.map((alert, index) => (
+            <div key={index} className="alert-item">
+              {alert.message}
+            </div>
+          ))
+        )}
+      </details>
 
       {/* PRODUCTS TABLE */}
       <div className="panel">
@@ -124,6 +137,7 @@ function App() {
           </tbody>
         </table>
       </div>
+
     </div>
   );
 }
