@@ -1,0 +1,33 @@
+/* ClickSpark wrapper styling */
+.click-spark-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* optional smooth interaction feel */
+.click-spark-wrapper {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.click-spark-wrapper * {
+  transition: all 0.15s ease;
+}
+
+canvas {
+  mix-blend-mode: screen;
+}
+
+.app {
+  height: 100vh;
+  background: radial-gradient(circle at top, #1a1a2e, #0f0f1a);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}

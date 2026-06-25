@@ -1,226 +1,222 @@
-/* ---------- Global ---------- */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  overflow-x: hidden;
+}
 
 body {
-  margin: 0;
-  padding: 0;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background: radial-gradient(circle at top, #0b1220, #05070f);
-  color: #e5e7eb;
+  font-family: Arial;
+  color: white;
 }
 
-* {
-  box-sizing: border-box;
-}
-
+/* FULL SCREEN FIX */
 .app {
   min-height: 100vh;
-  padding: 30px;
-  background: linear-gradient(
-    135deg,
-    #0b1120 0%,
-    #0f172a 50%,
-    #111827 100%
-  );
+  width: 100%;
+  padding: 20px;
+}
+.app {
+  min-height: 100vh;
+  width: 100vw;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
-/* ---------- Header ---------- */
-
+/* HEADER */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
 }
 
-.header h1 {
-  margin: 0;
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: white;
+/* ALERT BUTTON */
+.alert-btn {
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  cursor: pointer;
 }
 
-.status-card {
-  background: rgba(30, 41, 59, 0.9);
-  padding: 15px 25px;
-  border-radius: 14px;
-  border: 1px solid #334155;
+/* GRID */
+.grid {
+  margin-top: 15px;
+}
+
+/* GLASS CARD */
+.glass-card {
+  background: rgba(255,255,255,0.06);
   backdrop-filter: blur(10px);
+  padding: 14px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  box-shadow: 0 0 20px rgba(59,130,246,0.15);
 }
 
-.status-card span {
-  color: #94a3b8;
+/* GLASS PANEL */
+.glass-panel {
+  margin-top: 20px;
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(12px);
+  padding: 15px;
+  border-radius: 14px;
 }
 
-.status-card strong {
-  color: #22c55e;
-}
-
-/* ---------- Summary Cards ---------- */
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.summary-card {
-  background: rgba(30, 41, 59, 0.85);
-  border: 1px solid #334155;
-  border-radius: 18px;
-  padding: 25px;
-  transition: 0.3s ease;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-}
-
-.summary-card:hover {
-  transform: translateY(-4px);
-}
-
-.summary-card h3 {
-  margin: 0;
-  font-size: 15px;
-  color: #94a3b8;
-  font-weight: 500;
-}
-
-.summary-card strong {
-  display: block;
-  margin-top: 12px;
-  font-size: 38px;
-  color: #38bdf8;
-}
-
-/* ---------- Main Layout ---------- */
-
-.content-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 25px;
-}
-
-.panel {
-  background: rgba(30, 41, 59, 0.9);
-  border-radius: 18px;
-  padding: 25px;
-  border: 1px solid #334155;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-}
-
-.panel h2 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  color: white;
-}
-
-/* ---------- Table ---------- */
-
+/* TABLE */
 table {
   width: 100%;
   border-collapse: collapse;
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
-
-  background: #0f172a; /* deep slate background */
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 25px rgba(56,189,248,0.12);
 }
 
 /* HEADER */
-thead {
-  background: #111827; /* darker strip for header */
-}
-
 th {
   text-align: left;
-  padding: 14px 16px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #e5e7eb;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 14px;
+  color: #93c5fd;
+  background: rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.15);
 }
 
-/* BODY CELLS */
+/* ROWS */
 td {
-  padding: 14px 16px;
-  font-size: 14px;
-  color: #f3f4f6;
+  padding: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
 
-  background: transparent; /* 🔥 removes hidden white blocks */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+/* VERTICAL GRID LINES (THIS IS WHAT YOU’RE MISSING) */
+th, td {
+  border-right: 1px solid rgba(255,255,255,0.05);
+}
+
+th:last-child,
+td:last-child {
+  border-right: none;
 }
 
 /* ROW HOVER */
-tr:hover td {
-  background: rgba(59, 130, 246, 0.08);
+tr:hover {
+  background: rgba(59,130,246,0.08);
 }
 
-/* REMOVE ANY DEFAULT WHITE STRIPING */
-tbody tr {
-  background: transparent;
-}
-
-/* Make columns aligned properly */
-th, td {
-  text-align: left;
-  white-space: nowrap;
-}
-
-/* Optional: status styling */
-td:last-child {
-  font-weight: 500;
-  color: hsl(160, 84%, 39%);
-}
-
-.panel, .summary-card, .status-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* TABLE OUTER GLOW */
+.glass-panel {
+  margin-top: 20px;
+  padding: 16px;
   border-radius: 16px;
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
-.panel:hover {
-  transform: translateY(-2px);
-  transition: 0.2s ease;
-  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.15);
+/* STATUS COLORS */
+.good {
+  color: #22c55e;
+  font-weight: bold;
+  text-shadow: 0 0 6px rgba(34,197,94,0.5);
 }
 
-/* ---------- Alert Cards ---------- */
+.bad {
+  color: #ef4444;
+  font-weight: bold;
+  text-shadow: 0 0 6px rgba(239,68,68,0.5);
+}
 
-.slot-card {
-  background: #1e293b;
-  padding: 18px;
-  margin-bottom: 15px;
+/* POPUP */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.popup {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(15px);
+  padding: 20px;
+  width: 420px;
   border-radius: 14px;
-  border-left: 5px solid #38bdf8;
-  transition: 0.3s ease;
 }
 
-.slot-card:hover {
-  transform: translateX(5px);
+/* ALERT ROW */
+.alert-row {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  margin-top: 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 8px;
 }
 
-.slot-card strong {
-  display: block;
-  color: white;
-  margin-bottom: 8px;
-  font-size: 16px;
+.icon {
+  font-size: 18px;
 }
 
-.slot-card p {
-  margin: 5px 0;
-  color: #cbd5e1;
+/* BUTTON */
+button {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #38bdf8;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.grid {
+  display: flex;
+  gap: 15px;
+  margin-top: 15px;
 }
 
-/* ---------- Responsive ---------- */
+/* GLASS BUTTON */
+.glass-btn {
+  flex: 1;
+  padding: 16px;
+  border-radius: 14px;
+  cursor: pointer;
 
-@media (max-width: 900px) {
-  .content-grid {
-    grid-template-columns: 1fr;
-  }
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
 
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 15px;
-  }
+  backdrop-filter: blur(14px);
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  transition: 0.2s ease;
+
+  box-shadow: 0 0 20px rgba(59,130,246,0.08);
+}
+
+.glass-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 25px rgba(59,130,246,0.25);
+}
+
+body {
+  background: radial-gradient(circle at top, #070b14, #02040a);
+}
+
+.glass-btn,
+.glass-panel,
+.popup {
+  box-shadow:
+    0 0 25px rgba(59,130,246,0.10),
+    inset 0 0 12px rgba(255,255,255,0.04);
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
 }
