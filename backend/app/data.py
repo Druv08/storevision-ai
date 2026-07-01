@@ -4,7 +4,8 @@ products = [
         "name": "Lays",
         "category": "Snacks",
         "slot": "A1",
-        "expiry_date": "2026-07-20",
+        "expiry_date": "2026-08-20",
+        "stock_entry_date": "2026-06-01",
         "status": "available"
     },
     {
@@ -13,6 +14,7 @@ products = [
         "category": "Biscuits",
         "slot": "A2",
         "expiry_date": "2026-08-10",
+        "stock_entry_date": "2026-06-28",
         "status": "available"
     },
     {
@@ -20,7 +22,8 @@ products = [
         "name": "Coke",
         "category": "Drinks",
         "slot": "A3",
-        "expiry_date": "2026-09-01",
+        "expiry_date": "2026-07-06",
+        "stock_entry_date": "2026-06-28",
         "status": "available"
     },
     {
@@ -29,6 +32,7 @@ products = [
         "category": "Noodles",
         "slot": "A4",
         "expiry_date": "2026-08-25",
+        "stock_entry_date": "2026-06-28",
         "status": "available"
     },
     {
@@ -36,7 +40,8 @@ products = [
         "name": "Dairy Milk",
         "category": "Chocolate",
         "slot": "A5",
-        "expiry_date": "2026-07-15",
+        "expiry_date": "2026-06-25",
+        "stock_entry_date": "2026-06-28",
         "status": "available"
     }
 ]

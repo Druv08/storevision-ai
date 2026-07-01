@@ -7,25 +7,49 @@ const API_BASE_URL = "http://127.0.0.1:8000";
 export default function App() {
   const [products, setProducts] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [shelf, setShelf] = useState({});
+  const [connected, setConnected] = useState(null);
   const [showAlerts, setShowAlerts] = useState(false);
 
   useEffect(() => {
     fetchProducts();
+    fetchShelf();
     fetchAlerts();
     const interval = setInterval(fetchAlerts, 4000);
     return () => clearInterval(interval);
   }, []);
 
   const fetchProducts = async () => {
-    const res = await fetch(`${API_BASE_URL}/products`);
-    const data = await res.json();
-    setProducts(data.products || []);
+    try {
+      const res = await fetch(`${API_BASE_URL}/products`);
+      const data = await res.json();
+      setProducts(data.products || []);
+      setConnected(true);
+    } catch {
+      setConnected(false);
+    }
+  };
+
+  const fetchShelf = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/shelf-layout`);
+      const data = await res.json();
+      setShelf(data || {});
+      setConnected(true);
+    } catch {
+      setConnected(false);
+    }
   };
 
   const fetchAlerts = async () => {
-    const res = await fetch(`${API_BASE_URL}/alerts`);
-    const data = await res.json();
-    setAlerts(data.alerts || []);
+    try {
+      const res = await fetch(`${API_BASE_URL}/alerts`);
+      const data = await res.json();
+      setAlerts(data.alerts || []);
+      setConnected(true);
+    } catch {
+      setConnected(false);
+    }
   };
 
   const isGood = (status) =>
@@ -45,6 +69,13 @@ export default function App() {
         {/* HEADER */}
         <div className="header">
           <h1>StoreVision AI</h1>
+          <span className={connected ? "status good" : "status bad"}>
+            {connected === null
+              ? "⏳ Connecting..."
+              : connected
+              ? "🟢 Backend connected"
+              : "🔴 Backend offline"}
+          </span>
         </div>
 
         {/* CARDS */}
@@ -60,7 +91,7 @@ export default function App() {
 
 </div>
 
-        {/* TABLE */}
+        {/* PRODUCT TABLE */}
         <div className="glass-panel">
           <table>
             <thead>
@@ -88,8 +119,25 @@ export default function App() {
           </table>
         </div>
 
-        <div className="table-wrapper">
-          <table>...</table>
+        {/* SHELF LAYOUT */}
+        <div className="glass-panel">
+          <h2>Shelf Layout</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Slot</th>
+                <th>Expected Product</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(shelf).map(([slot, name]) => (
+                <tr key={slot}>
+                  <td>{slot}</td>
+                  <td>{name}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
         {/* POPUP */}

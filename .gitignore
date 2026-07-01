@@ -1,12 +1,50 @@
-# Python environment
-backend/venv/
-venv/
+# ---------------------------------------------
+# Python
+# ---------------------------------------------
 __pycache__/
 *.pyc
+*.pyo
 
-# Node modules
-frontend/node_modules/
+# Virtual environments
+venv/
+.venv/
+env/
+backend/venv/
+backend/.venv/
+
+# Environment variables / secrets
+.env
+*.env
+
+# ---------------------------------------------
+# Node / Frontend
+# ---------------------------------------------
 node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
 
-# System files
+# ---------------------------------------------
+# AI model artifacts (from Day 11 onward)
+# ---------------------------------------------
+runs/
+*.pt
+*.onnx
+*.pth
+*.weights
+
+# ---------------------------------------------
+# Datasets / large media
+# ---------------------------------------------
+*.mp4
+*.avi
+*.mov
+*.zip
+
+# ---------------------------------------------
+# System / editor
+# ---------------------------------------------
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
