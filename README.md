@@ -8,12 +8,16 @@ StoreVision AI analyzes shelf data to keep retail displays accurate and well-sto
 
 ## Current Status
 
-**Day 10 — stable MVP (backend + frontend, static data).** The alert engine, API, and dashboard are all working end-to-end on demo data. AI model training begins Day 11.
+**Day 11 — dataset preparation.** Dataset folder structure, image-collection
+plan, and Git-safe rules are in place, ready for image collection and YOLO
+training in the coming days. The backend + frontend MVP remains stable.
 
 - ✅ FastAPI backend with product data, shelf layout, and alert engine
 - ✅ React + Vite dashboard connected to the backend
 - ✅ All 5 alert types working from real logic (no fake/test data)
-- ⬜ YOLO object detection model (Day 11 onward)
+- ✅ Dataset structure + collection plan ready ([dataset/DATASET_PLAN.md](dataset/DATASET_PLAN.md))
+- ⬜ Image collection + labelling (next)
+- ⬜ YOLO object detection model training (upcoming)
 - ⬜ Real camera / image input (upcoming)
 
 ## Features

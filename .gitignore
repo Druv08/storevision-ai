@@ -25,7 +25,7 @@ dist/
 frontend/dist/
 
 # ---------------------------------------------
-# AI model artifacts (from Day 11 onward)
+# YOLO / model artifacts (from Day 11 onward)
 # ---------------------------------------------
 runs/
 *.pt
@@ -36,10 +36,26 @@ runs/
 # ---------------------------------------------
 # Datasets / large media
 # ---------------------------------------------
+# Videos
 *.mp4
 *.avi
 *.mov
 *.zip
+
+# Dataset images + label exports — keep folder structure and the plan,
+# but never push raw images, test images, or labelled exports to GitHub.
+dataset/**/*.jpg
+dataset/**/*.jpeg
+dataset/**/*.png
+dataset/**/*.bmp
+dataset/**/*.webp
+dataset/**/*.txt
+dataset/**/*.xml
+dataset/**/*.json
+dataset/**/*.cache
+# Always keep folder markers and the dataset plan
+!dataset/**/.gitkeep
+!dataset/DATASET_PLAN.md
 
 # ---------------------------------------------
 # System / editor
