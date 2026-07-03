@@ -8,15 +8,18 @@ StoreVision AI analyzes shelf data to keep retail displays accurate and well-sto
 
 ## Current Status
 
-**Day 11 — dataset preparation.** Dataset folder structure, image-collection
-plan, and Git-safe rules are in place, ready for image collection and YOLO
-training in the coming days. The backend + frontend MVP remains stable.
+**Day 12 — first labelled dataset added (locally).** An external Roboflow
+empty-shelf dataset (YOLOv8 format, single class `Empty-space`) has been placed
+under `dataset/labelled-data/` for detection prototyping. Dataset image/label
+files stay local and Git-ignored; only source notes are tracked. The
+backend + frontend MVP remains stable.
 
 - ✅ FastAPI backend with product data, shelf layout, and alert engine
 - ✅ React + Vite dashboard connected to the backend
 - ✅ All 5 alert types working from real logic (no fake/test data)
 - ✅ Dataset structure + collection plan ready ([dataset/DATASET_PLAN.md](dataset/DATASET_PLAN.md))
-- ⬜ Image collection + labelling (next)
+- ✅ First labelled dataset added locally ([dataset/ROBOFLOW_DATASET_SOURCE.md](dataset/ROBOFLOW_DATASET_SOURCE.md))
+- ⬜ Own 5-product image collection + labelling (next)
 - ⬜ YOLO object detection model training (upcoming)
 - ⬜ Real camera / image input (upcoming)
 

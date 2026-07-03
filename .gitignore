@@ -53,9 +53,13 @@ dataset/**/*.txt
 dataset/**/*.xml
 dataset/**/*.json
 dataset/**/*.cache
-# Always keep folder markers and the dataset plan
+# Dataset config exported with downloaded datasets (e.g. Roboflow data.yaml)
+dataset/**/*.yaml
+dataset/**/*.yml
+# Always keep folder markers and the tracked dataset docs
 !dataset/**/.gitkeep
 !dataset/DATASET_PLAN.md
+!dataset/ROBOFLOW_DATASET_SOURCE.md
 
 # ---------------------------------------------
 # System / editor
