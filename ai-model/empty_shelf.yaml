@@ -1,0 +1,11 @@
+# Dataset root — relative to this config file's folder (ai-model/)
+path: ../dataset/labelled-data/roboflow-empty-shelf
+
+# Split image folders — relative to `path` above
+train: train/images
+val: valid/images
+test: test/images
+
+# Classes
+nc: 1
+names: ['Empty-space']
