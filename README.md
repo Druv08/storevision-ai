@@ -8,9 +8,9 @@ StoreVision AI analyzes shelf data to keep retail displays accurate and well-sto
 
 ## Current Status
 
-**Day 13 — YOLO training setup prepared.** The empty-shelf dataset, a
-project-level YOLO config, and the training + detection scripts are in place,
-ready to train an empty-shelf detector. Dataset images and model outputs stay
+**Day 14 — first empty-shelf model trained.** A YOLOv8n model was trained
+(20 epochs) on the empty-shelf dataset and successfully detects empty shelf
+spaces on test images. Model weights, training outputs, and dataset files stay
 local and Git-ignored. The backend + frontend MVP remains stable.
 
 - ✅ FastAPI backend with product data, shelf layout, and alert engine
@@ -19,9 +19,25 @@ local and Git-ignored. The backend + frontend MVP remains stable.
 - ✅ Dataset structure + collection plan ready ([dataset/DATASET_PLAN.md](dataset/DATASET_PLAN.md))
 - ✅ First labelled dataset added locally ([dataset/ROBOFLOW_DATASET_SOURCE.md](dataset/ROBOFLOW_DATASET_SOURCE.md))
 - ✅ YOLO config + training/detection scripts prepared ([ai-model/](ai-model/))
-- ⬜ Train the empty-shelf model (next)
+- ✅ First empty-shelf model trained + detection tested (local)
 - ⬜ Own 5-product image collection + labelling (upcoming)
 - ⬜ Real camera / image input (upcoming)
+
+### Day 14
+
+- Ran the first full YOLOv8n training for empty shelf detection.
+- Verified that the trained model produced `best.pt` locally.
+- Tested the trained model on a sample test image.
+- Confirmed that training outputs, model weights, and dataset files remain ignored from GitHub.
+
+Final training metrics (20 epochs, empty-shelf validation set):
+
+| Metric | Value |
+|--------|-------|
+| Precision | 0.607 |
+| Recall | 0.542 |
+| mAP50 | 0.575 |
+| mAP50-95 | 0.245 |
 
 ### Day 13
 
