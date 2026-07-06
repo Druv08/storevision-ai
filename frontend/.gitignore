@@ -1,3 +1,13 @@
+# AI outputs
+ai-model/outputs/
+ai-model/runs/
+runs/
+*.pt
+*.onnx
+
+# dataset (important)
+dataset/labelled-data/
+
 # Logs
 logs
 *.log
@@ -22,3 +32,16 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Python virtual environments
+venv/
+.venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# YOLO training outputs
+runs/
+
+# Dataset and model files (optional depending on team decision)
+*.pt

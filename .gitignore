@@ -25,11 +25,15 @@ dist/
 frontend/dist/
 
 # ---------------------------------------------
-# YOLO / model artifacts (from Day 11 onward)
+# YOLO / model outputs (from Day 11 onward)
 # ---------------------------------------------
 runs/
+outputs/
+ai-model/outputs/
+ai-model/runs/
 *.pt
 *.onnx
+*.engine
 *.pth
 *.weights
 
