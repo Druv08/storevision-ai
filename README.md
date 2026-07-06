@@ -8,20 +8,29 @@ StoreVision AI analyzes shelf data to keep retail displays accurate and well-sto
 
 ## Current Status
 
-**Day 12 — first labelled dataset added (locally).** An external Roboflow
-empty-shelf dataset (YOLOv8 format, single class `Empty-space`) has been placed
-under `dataset/labelled-data/` for detection prototyping. Dataset image/label
-files stay local and Git-ignored; only source notes are tracked. The
-backend + frontend MVP remains stable.
+**Day 13 — YOLO training setup prepared.** The empty-shelf dataset, a
+project-level YOLO config, and the training + detection scripts are in place,
+ready to train an empty-shelf detector. Dataset images and model outputs stay
+local and Git-ignored. The backend + frontend MVP remains stable.
 
 - ✅ FastAPI backend with product data, shelf layout, and alert engine
 - ✅ React + Vite dashboard connected to the backend
 - ✅ All 5 alert types working from real logic (no fake/test data)
 - ✅ Dataset structure + collection plan ready ([dataset/DATASET_PLAN.md](dataset/DATASET_PLAN.md))
 - ✅ First labelled dataset added locally ([dataset/ROBOFLOW_DATASET_SOURCE.md](dataset/ROBOFLOW_DATASET_SOURCE.md))
-- ⬜ Own 5-product image collection + labelling (next)
-- ⬜ YOLO object detection model training (upcoming)
+- ✅ YOLO config + training/detection scripts prepared ([ai-model/](ai-model/))
+- ⬜ Train the empty-shelf model (next)
+- ⬜ Own 5-product image collection + labelling (upcoming)
 - ⬜ Real camera / image input (upcoming)
+
+### Day 13
+
+- Inspected the Roboflow empty shelf dataset.
+- Confirmed the dataset class: `Empty-space`.
+- Added a project-level YOLO config file for training.
+- Prepared the YOLO training script.
+- Prepared the YOLO detection test script.
+- Updated model-output ignore rules to avoid committing model weights and training outputs.
 
 ## Features
 

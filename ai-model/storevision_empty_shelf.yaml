@@ -1,0 +1,12 @@
+# StoreVision AI — YOLO dataset config (empty-shelf, single class).
+# Run training from inside ai-model/ so ".." resolves to the project root.
+# Dataset is Git-ignored; source/details in dataset/ROBOFLOW_DATASET_SOURCE.md
+
+path: ../dataset/labelled-data/roboflow-empty-shelf
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 1
+names:
+  - Empty-space

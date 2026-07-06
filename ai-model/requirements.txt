@@ -1,5 +1,6 @@
 ultralytics
 opencv-python
+Pillow
 numpy
 torch
 torchvision
