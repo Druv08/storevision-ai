@@ -27,7 +27,9 @@ BASE_MODEL = "yolov8n.pt"
 EPOCHS = 20
 IMG_SIZE = 640
 BATCH = 8
-PROJECT_DIR = "outputs/training-runs"
+# Absolute output path so results always land inside this project's ai-model/
+# folder, regardless of any global YOLO "runs_dir" setting on the machine.
+PROJECT_DIR = str(HERE / "outputs" / "training-runs")
 RUN_NAME = "empty_shelf_yolov8n_day13"
 
 
