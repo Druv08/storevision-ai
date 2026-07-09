@@ -32,6 +32,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
 # Python virtual environments
 venv/
 .venv/
@@ -45,3 +46,6 @@ runs/
 
 # Dataset and model files (optional depending on team decision)
 *.pt
+
+# Backend temporary uploads
+backend/uploads/

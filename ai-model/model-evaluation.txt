@@ -1,0 +1,36 @@
+StoreVision AI - Day 15 Model Evaluation
+
+Model:
+YOLOv8 Empty Shelf Detector
+
+Test Images Reviewed:
+
+1. test_468_jpg.rf.e43ddaf2a66e5f24b54b78c94387efee
+   Result: Good detection
+
+2. test_2_jpg.rf.f57ba1a778293c4ca7519b671fdaeb79
+   Result: Good detection
+
+3. test_478_jpg.rf.2a2815c008578b43b7e320ac3523266a
+   Result: Average detection
+
+4. test_479_jpg.rf.06e07e5e4fa2db7ccb2311c05525aa2b
+   Result: Poor detection
+
+5. test_407_jpg.rf.20b0ea47bfa22080bd5cfa98fd2e0b25
+   Result: Average detection
+
+6. test_368_jpg.rf.4bc76b073bf0f2e83fee1d44a1b729de
+   Result: Good detection
+
+
+Overall Evaluation:
+
+The YOLOv8 model successfully detects empty shelf spaces in most tested images.
+Most detections are accurate, but some images still have incorrect or incomplete bounding boxes.
+
+Future improvements:
+- Add more diverse shelf images
+- Increase training dataset size
+- Improve annotations
+- Train for more epochs if needed

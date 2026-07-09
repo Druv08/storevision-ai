@@ -1,5 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from app.ai_service import (
+    detect_empty_shelf as ai_detect_empty_shelf,
+    convert_ai_to_shelf_data
+)
+
+from app.detection_service import run_empty_shelf_detection
 
 from app.detection_logic import (
     generate_alerts,
@@ -12,7 +20,17 @@ from app.detection_data import (
     detected_products_normal
 )
 
+import shutil
+import os
+import tempfile
+from pathlib import Path
+
 app = FastAPI(title="StoreVision AI Backend")
+app.mount(
+    "/results",
+    StaticFiles(directory="runs/detect"),
+    name="results"
+)
 
 # ----------------------------
 # CORS
@@ -28,11 +46,33 @@ app.add_middleware(
         "http://127.0.0.1:5175",
         "http://localhost:5176",
         "http://127.0.0.1:5176",
+        "http://localhost:8001",      
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+ALLOWED_IMAGE_EXTENSIONS = {
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp"
+}
+
+
+def is_valid_image_upload(file: UploadFile) -> bool:
+    extension = Path(
+        file.filename or ""
+    ).suffix.lower()
+
+    if extension not in ALLOWED_IMAGE_EXTENSIONS:
+        return False
+
+    if file.content_type and file.content_type.startswith("image/"):
+        return True
+
+    return True
 
 # ----------------------------
 # PRODUCT DATA
@@ -83,9 +123,23 @@ def get_shelf():
 # ----------------------------
 @app.get("/alerts")
 def get_alerts():
-    all_alerts = generate_all_alerts(detected_products_missing, products)
+
+    image_path = (
+        "../dataset/labelled-data/roboflow-empty-shelf/test/images/test_468_jpg.rf.e43ddaf2a66e5f24b54b78c94387efee.jpg"
+    )
+
+    ai_result = ai_detect_empty_shelf(image_path)
+
+    shelf_data = convert_ai_to_shelf_data(ai_result)
+
+    all_alerts = generate_all_alerts(
+        shelf_data,
+        products
+    )
 
     return {
+        "ai_detection": ai_result,
+        "shelf_status": shelf_data,
         "total_alerts": len(all_alerts),
         "alerts": all_alerts
     }
@@ -113,3 +167,113 @@ def alerts_wrong():
         "mode": "wrong",
         "alerts": generate_alerts(detected_products_wrong)
     }
+
+@app.get("/detect-test")
+def detect_test():
+
+    image_path = (
+        "../dataset/labelled-data/roboflow-empty-shelf/test/images/test_468_jpg.rf.e43ddaf2a66e5f24b54b78c94387efee.jpg"
+    )
+
+    result = ai_detect_empty_shelf(image_path)
+
+    return result
+
+@app.post("/upload-image")
+async def upload_image(file: UploadFile = File(...)):
+    upload_dir = Path("uploads")
+
+    upload_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    upload_path = Path("uploads") / file.filename
+
+    with open(upload_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    ai_result = ai_detect_empty_shelf(str(upload_path))
+
+    shelf_data = convert_ai_to_shelf_data(ai_result)
+
+    alerts = generate_all_alerts(
+        shelf_data,
+        products
+    )
+
+    return {
+        "filename": file.filename,
+        "ai_detection": ai_result,
+        "shelf_status": shelf_data,
+        "total_alerts": len(alerts),
+        "alerts": alerts
+    }
+
+@app.post("/detect")
+async def detect_endpoint(
+    file: UploadFile = File(...)
+):
+
+    if not is_valid_image_upload(file):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid image file"
+        )
+
+    suffix = Path(
+        file.filename or ""
+    ).suffix.lower()
+
+    temp_file_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=suffix
+        ) as temp_file:
+
+
+            temp_file_path = temp_file.name
+
+            content = await file.read()
+
+            temp_file.write(content)
+
+
+
+        result = run_empty_shelf_detection(
+            temp_file_path
+        )
+
+
+        return {
+            "filename": file.filename,
+            "detection_count": result["detection_count"],
+            "issue_detected": result["issue_detected"],
+            "detections": result["detections"],
+            "annotated_image": result["annotated_image"]
+
+        }
+
+
+    except FileNotFoundError as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(error)
+        )
+
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Detection failed: {str(error)}"
+        )
+
+
+    finally:
+
+        if temp_file_path and os.path.exists(temp_file_path):
+
+            os.remove(temp_file_path)

@@ -1,13 +1,17 @@
 """
-StoreVision AI - Empty Shelf detection test (Day 13).
+StoreVision AI - Empty Shelf Detection Test (Day 15)
 
-Runs a trained YOLOv8 model on a single image to detect empty shelf spaces
-(class: "Empty-space") and saves the annotated result image.
+Runs the trained YOLOv8 model on one image or a folder of images.
+Saves annotated prediction results locally.
 
-Run it from inside the ai-model/ folder:
+Run from inside ai-model:
 
     python detect.py
-    python detect.py --model <path-to-weights.pt> --source <path-to-image>
+
+Optional:
+
+    python detect.py --model path/to/model.pt
+    python detect.py --source path/to/image_or_folder
 """
 
 from pathlib import Path
@@ -16,70 +20,173 @@ import sys
 
 from ultralytics import YOLO
 
-# Build paths from this file's location so nothing is hardcoded and the script
-# stays portable across machines.
-HERE = Path(__file__).resolve().parent            # .../storevision-ai/ai-model
 
-DEFAULT_MODEL = HERE / "outputs" / "training-runs" / "empty_shelf_yolov8n_day13" / "weights" / "best.pt"
-DEFAULT_SOURCE = HERE / ".." / "dataset" / "sample-test-images" / "test_image.jpg"
-RESULTS_DIR = HERE / "outputs" / "detection-results"
+# Project paths
+HERE = Path(__file__).resolve().parent
+PROJECT_ROOT = HERE.parent
 
-# Only keep detections the model is at least 25% confident about.
-CONFIDENCE = 0.25
+
+# Trained YOLO model
+DEFAULT_MODEL = (
+    PROJECT_ROOT
+    / "runs"
+    / "detect"
+    / "train-3"
+    / "weights"
+    / "best.pt"
+)
+
+
+# Test dataset images
+DEFAULT_SOURCE = (
+    PROJECT_ROOT
+    / "dataset"
+    / "labelled-data"
+    / "roboflow-empty-shelf"
+    / "test"
+    / "images"
+)
+
+
+# Detection output folder
+RESULTS_DIR = (
+    HERE
+    / "outputs"
+    / "detection-results"
+)
+
+
+CONFIDENCE = 0.20
+
 
 
 def parse_args():
+
     parser = argparse.ArgumentParser(
-        description="Test the empty-shelf YOLO model on a single image."
+        description="Run StoreVision AI empty shelf detection"
     )
-    parser.add_argument("--model", default=str(DEFAULT_MODEL),
-                        help="Path to trained YOLO weights (.pt)")
-    parser.add_argument("--source", default=str(DEFAULT_SOURCE),
-                        help="Path to the image to run detection on")
+
+
+    parser.add_argument(
+        "--model",
+        default=str(DEFAULT_MODEL),
+        help="Path to YOLO weights"
+    )
+
+
+    parser.add_argument(
+        "--source",
+        default=str(DEFAULT_SOURCE),
+        help="Path to image or folder"
+    )
+
+
     return parser.parse_args()
 
 
+
 def main():
+
     args = parse_args()
+
+
     model_path = Path(args.model).resolve()
     source_path = Path(args.source).resolve()
 
-    # 1. The trained model must exist.
+
+    # Check model exists
+
     if not model_path.exists():
-        print(f"ERROR: trained model not found: {model_path}")
-        print("Train the model first by running train.py, then try again.")
-        print("Expected weights at:")
-        print("  outputs/training-runs/empty_shelf_yolov8n_day13/weights/best.pt")
+
+        print("\nERROR: Model file not found")
+        print(model_path)
+
+        print(
+            "\nExpected location:"
+            "\nruns/detect/train-3/weights/best.pt"
+        )
+
         sys.exit(1)
 
-    # 2. The test image must exist.
+
+
+    # Check source exists
+
     if not source_path.exists():
-        print(f"ERROR: test image not found: {source_path}")
-        print("Put an image at dataset/sample-test-images/test_image.jpg,")
-        print("or pass one with:  python detect.py --source <path-to-image>")
+
+        print("\nERROR: Test images not found")
+        print(source_path)
+
+        print(
+            "\nExpected location:"
+            "\ndataset/labelled-data/roboflow-empty-shelf/test/images"
+        )
+
         sys.exit(1)
 
+
+
     print("=" * 60)
-    print("StoreVision AI - Empty Shelf detection")
-    print(f"  model  : {model_path}")
-    print(f"  image  : {source_path}")
-    print(f"  conf   : {CONFIDENCE}")
-    print(f"  output : {RESULTS_DIR}")
+    print("StoreVision AI - Empty Shelf Detection")
     print("=" * 60)
 
-    # 3. Run detection and save the annotated image.
+    print(f"Model  : {model_path}")
+    print(f"Source : {source_path}")
+    print(f"Output : {RESULTS_DIR}")
+    print(f"Conf   : {CONFIDENCE}")
+
+    print("=" * 60)
+
+
+
+    # Load YOLO model
+
     model = YOLO(str(model_path))
-    model.predict(
+    print("Loaded model:", model_path)
+    print("Model classes:", model.names)
+
+
+
+    # Run detection
+
+    results = model.predict(
         source=str(source_path),
         conf=CONFIDENCE,
+        imgsz=1024,
         save=True,
-        project=str(RESULTS_DIR.parent),   # outputs/
-        name=RESULTS_DIR.name,             # detection-results/
-        exist_ok=True,
+        project=str(RESULTS_DIR.parent),
+        name=RESULTS_DIR.name,
+        exist_ok=True
     )
 
-    print("\nDetection complete. Annotated image saved under:")
-    print(f"  {RESULTS_DIR}")
+    for result in results:
+     print("Number of detections:", len(result.boxes))
+
+     for box in result.boxes:
+        cls = int(box.cls[0])
+        confidence = float(box.conf[0])
+
+        print(
+            "Class:",
+            cls,
+            "Confidence:",
+            round(confidence, 3)
+        )
+
+    
+
+    print("\nDetection completed successfully.")
+    print(
+        f"Images processed: {len(results)}"
+    )
+
+    print(
+        "\nResults saved at:"
+    )
+
+    print(
+        RESULTS_DIR
+    )
 
 
 if __name__ == "__main__":

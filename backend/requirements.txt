@@ -1,2 +1,6 @@
 fastapi
 uvicorn[standard]
+ultralytics
+python-multipart
+opencv-python
+pillow

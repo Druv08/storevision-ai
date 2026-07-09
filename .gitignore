@@ -72,3 +72,6 @@ dataset/**/*.yml
 Thumbs.db
 .vscode/
 .idea/
+
+# Backend uploaded images
+/backend/uploads/
