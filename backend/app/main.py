@@ -1,13 +1,11 @@
-from fastapi import FastAPI, File, HTTPException, UploadFile
+import os
+import tempfile
+from pathlib import Path
+
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-
-from app.ai_service import (
-    detect_empty_shelf as ai_detect_empty_shelf,
-    convert_ai_to_shelf_data
-)
-
-from app.detection_service import run_empty_shelf_detection
+from PIL import Image
 
 from app.detection_logic import (
     generate_alerts,
@@ -20,17 +18,15 @@ from app.detection_data import (
     detected_products_normal
 )
 
-import shutil
-import os
-import tempfile
-from pathlib import Path
+from app.detection_service import run_empty_shelf_detection
 
 app = FastAPI(title="StoreVision AI Backend")
-app.mount(
-    "/results",
-    StaticFiles(directory="runs/detect"),
-    name="results"
-)
+
+# Annotated result images are saved here and served at /results/<filename>.
+# The folder is inside backend/outputs/ which is Git-ignored.
+ANNOTATED_DIR = Path(__file__).resolve().parents[1] / "outputs" / "annotated"
+ANNOTATED_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/results", StaticFiles(directory=str(ANNOTATED_DIR)), name="results")
 
 # ----------------------------
 # CORS
@@ -46,33 +42,11 @@ app.add_middleware(
         "http://127.0.0.1:5175",
         "http://localhost:5176",
         "http://127.0.0.1:5176",
-        "http://localhost:8001",      
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-ALLOWED_IMAGE_EXTENSIONS = {
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".webp"
-}
-
-
-def is_valid_image_upload(file: UploadFile) -> bool:
-    extension = Path(
-        file.filename or ""
-    ).suffix.lower()
-
-    if extension not in ALLOWED_IMAGE_EXTENSIONS:
-        return False
-
-    if file.content_type and file.content_type.startswith("image/"):
-        return True
-
-    return True
 
 # ----------------------------
 # PRODUCT DATA
@@ -119,27 +93,131 @@ def get_shelf():
     return shelf_layout
 
 # ----------------------------
+# EMPTY-SHELF DETECTION (image upload)
+# ----------------------------
+@app.post("/detect")
+async def detect(file: UploadFile = File(...)):
+    # Only accept image uploads.
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
+
+    # Save the upload to a temporary file, run detection, then clean up.
+    suffix = os.path.splitext(file.filename or "")[1] or ".jpg"
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
+
+        result = run_empty_shelf_detection(tmp_path)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Detection failed: {exc}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+    message = (
+        "Empty shelf space detected"
+        if result["issue_detected"]
+        else "No empty shelf space detected"
+    )
+    return {
+        "filename": file.filename,
+        "detection_count": result["detection_count"],
+        "issue_detected": result["issue_detected"],
+        "detections": result["detections"],
+        "message": message,
+    }
+
+# ----------------------------
+# DASHBOARD IMAGE ANALYSIS (upload -> AI detection -> shelf status -> alerts)
+# ----------------------------
+# Detections at or above this confidence are trusted enough to mark a shelf
+# slot as empty when mapping boxes to slots.
+SLOT_CONFIDENCE = 0.40
+
+
+def map_detections_to_shelf(detections, image_width):
+    """Map empty-space boxes to shelf slots A1-A5 by horizontal position."""
+    slots = list(shelf_layout.keys())          # ["A1", ..., "A5"]
+    shelf_status = dict(shelf_layout)          # start with expected products
+    band = image_width / len(slots)            # each slot covers one vertical band
+
+    for det in detections:
+        if det["confidence"] < SLOT_CONFIDENCE:
+            continue
+        center_x = (det["box"]["x1"] + det["box"]["x2"]) / 2
+        index = min(len(slots) - 1, int(center_x // band))
+        shelf_status[slots[index]] = None      # None = slot looks empty
+
+    return shelf_status
+
+
+@app.post("/upload-image")
+async def upload_image(file: UploadFile = File(...)):
+    # Only accept image uploads.
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Uploaded file must be an image.")
+
+    suffix = os.path.splitext(file.filename or "")[1] or ".jpg"
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await file.read())
+            tmp_path = tmp.name
+
+        result = run_empty_shelf_detection(tmp_path, annotate_dir=str(ANNOTATED_DIR))
+        image_width = Image.open(tmp_path).size[0]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Detection failed: {exc}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+    # Turn the detections into real shelf status + alerts.
+    shelf_status = map_detections_to_shelf(result["detections"], image_width)
+    alerts = generate_all_alerts(shelf_status, products)
+
+    # Shape the detections the way the dashboard expects (box as [x1,y1,x2,y2]).
+    detections = [
+        {
+            "class": d["class_name"],
+            "confidence": d["confidence"],
+            "box": [d["box"]["x1"], d["box"]["y1"], d["box"]["x2"], d["box"]["y2"]],
+        }
+        for d in result["detections"]
+    ]
+
+    annotated_image = (
+        f"results/{result['annotated_file']}" if result["annotated_file"] else None
+    )
+
+    return {
+        "filename": file.filename,
+        "ai_detection": {
+            "detection_count": result["detection_count"],
+            "issue_detected": result["issue_detected"],
+            "detections": detections,
+            "annotated_image": annotated_image,
+        },
+        "shelf_status": shelf_status,
+        "total_alerts": len(alerts),
+        "alerts": alerts,
+    }
+
+
+# ----------------------------
 # MAIN ALERT ENGINE
 # ----------------------------
 @app.get("/alerts")
 def get_alerts():
-
-    image_path = (
-        "../dataset/labelled-data/roboflow-empty-shelf/test/images/test_468_jpg.rf.e43ddaf2a66e5f24b54b78c94387efee.jpg"
-    )
-
-    ai_result = ai_detect_empty_shelf(image_path)
-
-    shelf_data = convert_ai_to_shelf_data(ai_result)
-
-    all_alerts = generate_all_alerts(
-        shelf_data,
-        products
-    )
+    all_alerts = generate_all_alerts(detected_products_missing, products)
 
     return {
-        "ai_detection": ai_result,
-        "shelf_status": shelf_data,
         "total_alerts": len(all_alerts),
         "alerts": all_alerts
     }
@@ -167,113 +245,3 @@ def alerts_wrong():
         "mode": "wrong",
         "alerts": generate_alerts(detected_products_wrong)
     }
-
-@app.get("/detect-test")
-def detect_test():
-
-    image_path = (
-        "../dataset/labelled-data/roboflow-empty-shelf/test/images/test_468_jpg.rf.e43ddaf2a66e5f24b54b78c94387efee.jpg"
-    )
-
-    result = ai_detect_empty_shelf(image_path)
-
-    return result
-
-@app.post("/upload-image")
-async def upload_image(file: UploadFile = File(...)):
-    upload_dir = Path("uploads")
-
-    upload_dir.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-
-    upload_path = Path("uploads") / file.filename
-
-    with open(upload_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    ai_result = ai_detect_empty_shelf(str(upload_path))
-
-    shelf_data = convert_ai_to_shelf_data(ai_result)
-
-    alerts = generate_all_alerts(
-        shelf_data,
-        products
-    )
-
-    return {
-        "filename": file.filename,
-        "ai_detection": ai_result,
-        "shelf_status": shelf_data,
-        "total_alerts": len(alerts),
-        "alerts": alerts
-    }
-
-@app.post("/detect")
-async def detect_endpoint(
-    file: UploadFile = File(...)
-):
-
-    if not is_valid_image_upload(file):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid image file"
-        )
-
-    suffix = Path(
-        file.filename or ""
-    ).suffix.lower()
-
-    temp_file_path = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            delete=False,
-            suffix=suffix
-        ) as temp_file:
-
-
-            temp_file_path = temp_file.name
-
-            content = await file.read()
-
-            temp_file.write(content)
-
-
-
-        result = run_empty_shelf_detection(
-            temp_file_path
-        )
-
-
-        return {
-            "filename": file.filename,
-            "detection_count": result["detection_count"],
-            "issue_detected": result["issue_detected"],
-            "detections": result["detections"],
-            "annotated_image": result["annotated_image"]
-
-        }
-
-
-    except FileNotFoundError as error:
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(error)
-        )
-
-
-    except Exception as error:
-
-        raise HTTPException(
-            status_code=500,
-            detail=f"Detection failed: {str(error)}"
-        )
-
-
-    finally:
-
-        if temp_file_path and os.path.exists(temp_file_path):
-
-            os.remove(temp_file_path)

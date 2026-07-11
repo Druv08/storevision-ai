@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-const API_BASE_URL = "http://127.0.0.1:8001";
+const API_BASE_URL = "http://127.0.0.1:8000";
 
 export default function App() {
   const [products, setProducts] = useState([]);
@@ -237,9 +237,6 @@ export default function App() {
             {/* IMAGE SECTION */}
             <div className="image-section">
               <h3>Selected Image</h3>
-              <p style={{ color: "cyan", fontWeight: "bold" }}>
-                Loading: {loading ? "TRUE" : "FALSE"}
-              </p>
 
               <div className={`image-wrapper ${loading ? "scanning" : ""}`}>
                 <img
