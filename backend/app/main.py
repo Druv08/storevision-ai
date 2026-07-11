@@ -223,6 +223,79 @@ def get_alerts():
     }
 
 # ----------------------------
+# SMART SUGGESTIONS
+# ----------------------------
+PRIORITY_RANK = {"High": 0, "Medium": 1, "Low": 2}
+
+
+def build_suggestion(alert):
+    """Turn one alert into a store suggestion with a priority and an action."""
+    alert_type = alert.get("type")
+    slot = alert.get("slot", "?")
+
+    if alert_type == "missing_item":
+        product = alert.get("expected", "Unknown")
+        return {
+            "priority": "High",
+            "product": product,
+            "issue": "Missing item",
+            "action": f"Restock {product} in shelf {slot} immediately",
+        }
+    if alert_type == "expired_product":
+        product = alert.get("product", "Unknown")
+        return {
+            "priority": "High",
+            "product": product,
+            "issue": "Expired product",
+            "action": f"Remove expired {product} from shelf {slot}",
+        }
+    if alert_type == "near_expiry":
+        product = alert.get("product", "Unknown")
+        return {
+            "priority": "Medium",
+            "product": product,
+            "issue": "Near expiry",
+            "action": f"Move {product} to the front shelf or apply a discount",
+        }
+    if alert_type == "wrong_placement":
+        product = alert.get("detected", "Unknown")
+        return {
+            "priority": "Medium",
+            "product": product,
+            "issue": "Wrong placement",
+            "action": f"Move {product} out of slot {slot} back to its own slot",
+        }
+    if alert_type == "old_stock":
+        product = alert.get("product", "Unknown")
+        return {
+            "priority": "Low",
+            "product": product,
+            "issue": "Old stock",
+            "action": f"Review stock age of {product} in shelf {slot}",
+        }
+    return None
+
+
+@app.get("/smart-suggestions")
+def smart_suggestions():
+    all_alerts = generate_all_alerts(detected_products_missing, products)
+
+    suggestions = []
+    for alert in all_alerts:
+        suggestion = build_suggestion(alert)
+        if suggestion:
+            suggestions.append(suggestion)
+
+    # Most urgent first: High, then Medium, then Low.
+    suggestions.sort(key=lambda s: PRIORITY_RANK[s["priority"]])
+
+    return {
+        "total_suggestions": len(suggestions),
+        "suggestions": suggestions,
+    }
+
+
+# ----------------------------
 # DEBUG ROUTES
 # ----------------------------
 @app.get("/alerts/normal")

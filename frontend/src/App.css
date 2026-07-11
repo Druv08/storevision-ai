@@ -635,3 +635,71 @@ tbody tr:hover {
         opacity:.4;
     }
 }
+
+/* =========================
+   SMART SUGGESTIONS
+========================= */
+
+.suggestions-grid {
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px;
+}
+
+.suggestion-card {
+    flex:1 1 260px;
+    max-width:340px;
+    padding:18px;
+    border-radius:16px;
+    background:rgba(255,255,255,.07);
+    border:1px solid var(--border);
+    border-left:5px solid #4ade80;
+}
+
+.suggestion-card.priority-high {
+    border-left-color:#ff6b6b;
+}
+
+.suggestion-card.priority-medium {
+    border-left-color:#facc15;
+}
+
+.suggestion-card.priority-low {
+    border-left-color:#4ade80;
+}
+
+.priority-badge {
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:1px;
+    padding:3px 10px;
+    border-radius:999px;
+}
+
+.badge-high {
+    background:rgba(255,107,107,.2);
+    color:#ff6b6b;
+}
+
+.badge-medium {
+    background:rgba(250,204,21,.18);
+    color:#facc15;
+}
+
+.badge-low {
+    background:rgba(74,222,128,.18);
+    color:#4ade80;
+}
+
+.suggestion-card h3 {
+    margin:12px 0 4px;
+}
+
+.suggestion-issue {
+    color:var(--muted);
+    margin:0 0 8px;
+}
+
+.suggestion-action {
+    margin:0;
+}

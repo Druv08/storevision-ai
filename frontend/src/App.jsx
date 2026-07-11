@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import SmartSuggestions from "./components/SmartSuggestions";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -26,19 +27,6 @@ export default function App() {
   const [lastScan, setLastScan] = useState("Not scanned yet");
 
   const [showAlerts, setShowAlerts] = useState(false);
-
-  useEffect(() => {
-    checkBackend();
-    fetchProducts();
-    fetchShelf();
-    fetchAlerts();
-
-    const interval = setInterval(() => {
-      checkBackend();
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const fetchProducts = async () => {
     try {
@@ -132,6 +120,19 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    checkBackend();
+    fetchProducts();
+    fetchShelf();
+    fetchAlerts();
+
+    const interval = setInterval(() => {
+      checkBackend();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const handleFile = (e) => {
     const file = e.target.files[0];
 
@@ -205,6 +206,9 @@ export default function App() {
           <p className="scan-time">{lastScan}</p>
         </div>
       </div>
+
+      {/* SMART SUGGESTIONS */}
+      <SmartSuggestions />
 
       {/* IMAGE ANALYSIS */}
       <div className="glass-panel">
