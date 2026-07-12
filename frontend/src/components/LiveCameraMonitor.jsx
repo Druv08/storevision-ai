@@ -104,6 +104,8 @@ function mergeNearbyDetections(detections) {
 export default function LiveCameraMonitor() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const intervalRef = useRef(null);   // auto-scan timer
+  const isScanningRef = useRef(false); // prevents two scans at the same time
 
   const [stream, setStream] = useState(null);
   const [capturedImage, setCapturedImage] = useState(null);
@@ -111,6 +113,11 @@ export default function LiveCameraMonitor() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [scanIntervalSeconds, setScanIntervalSeconds] = useState(5);
+  const [lastScanTime, setLastScanTime] = useState(null);
+  const [scanCount, setScanCount] = useState(0);
 
   // Final display pipeline: filter weak boxes, drop duplicates, merge gaps.
   const confidentDetections =
@@ -151,7 +158,16 @@ export default function LiveCameraMonitor() {
     }
   };
 
+  const stopMonitoring = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setIsMonitoring(false);
+  };
+
   const stopCamera = () => {
+    stopMonitoring(); // never leave the auto-scan running without a camera
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
     }
@@ -161,22 +177,28 @@ export default function LiveCameraMonitor() {
     }
   };
 
-  // Stop the camera when the component is removed from the page.
+  // Stop the timer and camera when the component is removed from the page.
   useEffect(() => {
     return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
     };
   }, [stream]);
 
-  const captureFrame = async () => {
+  const analyzeCurrentFrame = async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas || !stream) return;
+    if (!video || !canvas || !video.srcObject) return;
+
+    // Skip this tick if the previous scan is still running.
+    if (isScanningRef.current) return;
+    isScanningRef.current = true;
 
     setError("");
-    setResult(null);
     setLoading(true);
 
     try {
@@ -191,6 +213,7 @@ export default function LiveCameraMonitor() {
       canvas.getContext("2d").drawImage(video, 0, 0);
 
       // Turn the canvas into an image file the backend can accept.
+      // Nothing is saved to disk - it all stays in browser memory.
       const blob = await new Promise((resolve) =>
         canvas.toBlob(resolve, "image/jpeg", 0.9)
       );
@@ -199,16 +222,47 @@ export default function LiveCameraMonitor() {
       }
       const file = new File([blob], "camera_frame.jpg", { type: "image/jpeg" });
 
-      setCapturedImage(URL.createObjectURL(blob));
+      setCapturedImage((old) => {
+        if (old) URL.revokeObjectURL(old); // free the previous frame's memory
+        return URL.createObjectURL(blob);
+      });
 
       const data = await detectShelfImage(file);
       setResult(data);
+      setScanCount((count) => count + 1);
+      setLastScanTime(
+        new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })
+      );
     } catch (err) {
+      // Show the error but keep monitoring alive - the next tick may succeed.
       setError(err.message || "Something went wrong");
     } finally {
       setLoading(false);
+      isScanningRef.current = false;
     }
   };
+
+  const startMonitoring = () => {
+    if (!stream) {
+      setError("Start camera before monitoring");
+      return;
+    }
+
+    setIsMonitoring(true);
+    analyzeCurrentFrame(); // first scan right away, then repeat on the timer
+
+    intervalRef.current = setInterval(() => {
+      analyzeCurrentFrame();
+    }, scanIntervalSeconds * 1000);
+  };
+
+  const latestResultText = result
+    ? result.message
+    : "No scans yet";
 
   return (
     <div className="glass-panel">
@@ -228,15 +282,69 @@ export default function LiveCameraMonitor() {
             <button className="stop-btn" onClick={stopCamera}>
               Stop Camera
             </button>
+
             <button
               className="analyze-btn"
-              onClick={captureFrame}
+              onClick={analyzeCurrentFrame}
               disabled={loading}
             >
               {loading ? "Analyzing..." : "Analyze Current Frame"}
             </button>
+
+            {!isMonitoring ? (
+              <button className="monitor-btn" onClick={startMonitoring}>
+                Start Monitoring
+              </button>
+            ) : (
+              <button className="stop-btn" onClick={stopMonitoring}>
+                Stop Monitoring
+              </button>
+            )}
+
+            <label className="interval-label">
+              Scan every:{" "}
+              <select
+                value={scanIntervalSeconds}
+                onChange={(e) => setScanIntervalSeconds(Number(e.target.value))}
+                disabled={isMonitoring}
+              >
+                <option value={3}>3 seconds</option>
+                <option value={5}>5 seconds</option>
+                <option value={10}>10 seconds</option>
+              </select>
+            </label>
           </>
         )}
+      </div>
+
+      {/* MONITORING STATUS */}
+      <div className="status-grid">
+        <div className="status-item">
+          <span className="status-label">Camera</span>
+          <span className="status-value">{stream ? "On" : "Off"}</span>
+        </div>
+        <div className="status-item">
+          <span className="status-label">Monitoring</span>
+          <span className="status-value">
+            {isMonitoring ? "🟢 Active" : "Stopped"}
+          </span>
+        </div>
+        <div className="status-item">
+          <span className="status-label">Scan interval</span>
+          <span className="status-value">{scanIntervalSeconds} seconds</span>
+        </div>
+        <div className="status-item">
+          <span className="status-label">Total scans</span>
+          <span className="status-value">{scanCount}</span>
+        </div>
+        <div className="status-item">
+          <span className="status-label">Last scan</span>
+          <span className="status-value">{lastScanTime || "—"}</span>
+        </div>
+        <div className="status-item">
+          <span className="status-label">Latest result</span>
+          <span className="status-value">{latestResultText}</span>
+        </div>
       </div>
 
       {error && <p className="danger">Error: {error}</p>}
