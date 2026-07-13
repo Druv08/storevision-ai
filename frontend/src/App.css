@@ -845,3 +845,71 @@ tbody tr:hover {
     font-weight:600;
     color:var(--ice);
 }
+
+/* =========================
+   SHELF ZONES
+========================= */
+
+.zone-toggle {
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:10px;
+    color:var(--muted);
+    font-size:14px;
+    cursor:pointer;
+    user-select:none;
+}
+
+.zone-toggle input {
+    accent-color:var(--cyan);
+    cursor:pointer;
+}
+
+.zone-grid {
+    position:absolute;
+    inset:0;
+    display:grid;
+    grid-template-columns:repeat(5, 1fr);
+    grid-template-rows:repeat(3, 1fr);
+    pointer-events:none;
+}
+
+.zone-cell {
+    position:relative;
+    border:1px dashed rgba(255,255,255,.25);
+}
+
+.zone-cell-label {
+    position:absolute;
+    top:2px;
+    left:5px;
+    font-size:11px;
+    font-weight:600;
+    color:rgba(255,255,255,.65);
+    text-shadow:0 1px 3px rgba(0,0,0,.9);
+}
+
+.zone-summary {
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:12px;
+}
+
+.zone-chip {
+    padding:5px 14px;
+    border-radius:999px;
+    background:rgba(255,107,107,.18);
+    border:1px solid rgba(255,107,107,.5);
+    color:#ff6b6b;
+    font-weight:700;
+    letter-spacing:1px;
+}
+
+.zone-note {
+    color:var(--muted);
+    font-size:13px;
+    font-style:italic;
+    margin-bottom:0;
+}

@@ -5,6 +5,11 @@ import { detectShelfImage } from "../services/detectionApi";
 const DISPLAY_CONFIDENCE_THRESHOLD = 0.35; // hide weak/noisy boxes
 const IOU_SUPPRESSION_THRESHOLD = 0.4;     // overlapping boxes above this are duplicates
 
+// Shelf zone grid: rows are shelf levels (A = top), columns split each level.
+const SHELF_ROWS = ["A", "B", "C"];
+const SHELF_COLUMNS = [1, 2, 3, 4, 5];
+const SHOW_ZONE_GRID_DEFAULT = true;
+
 // Intersection-over-Union of two boxes ({x1, y1, x2, y2}). Returns 0..1.
 function calculateIoU(boxA, boxB) {
   const xLeft = Math.max(boxA.x1, boxB.x1);
@@ -101,6 +106,25 @@ function mergeNearbyDetections(detections) {
   return merged;
 }
 
+// Map a detection box to a shelf zone like "B3" using the box center.
+// Must be given the ORIGINAL image size, not the displayed (scaled) size.
+function getZoneForBox(box, imageWidth, imageHeight) {
+  const centerX = (box.x1 + box.x2) / 2;
+  const centerY = (box.y1 + box.y2) / 2;
+
+  const colIndex = Math.min(
+    SHELF_COLUMNS.length - 1,
+    Math.max(0, Math.floor((centerX / imageWidth) * SHELF_COLUMNS.length))
+  );
+
+  const rowIndex = Math.min(
+    SHELF_ROWS.length - 1,
+    Math.max(0, Math.floor((centerY / imageHeight) * SHELF_ROWS.length))
+  );
+
+  return `${SHELF_ROWS[rowIndex]}${SHELF_COLUMNS[colIndex]}`;
+}
+
 export default function LiveCameraMonitor() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -118,15 +142,28 @@ export default function LiveCameraMonitor() {
   const [scanIntervalSeconds, setScanIntervalSeconds] = useState(5);
   const [lastScanTime, setLastScanTime] = useState(null);
   const [scanCount, setScanCount] = useState(0);
+  const [showZoneGrid, setShowZoneGrid] = useState(SHOW_ZONE_GRID_DEFAULT);
 
-  // Final display pipeline: filter weak boxes, drop duplicates, merge gaps.
+  // Final display pipeline: filter weak boxes, drop duplicates, merge gaps,
+  // then tag each remaining detection with its shelf zone (A1..C5).
   const confidentDetections =
     result?.detections?.filter(
       (d) => d.confidence >= DISPLAY_CONFIDENCE_THRESHOLD
     ) ?? [];
   const finalDetections = mergeNearbyDetections(
     removeDuplicateDetections(confidentDetections)
-  );
+  ).map((d) => ({
+    ...d,
+    zone:
+      imgSize.w > 0 && imgSize.h > 0
+        ? getZoneForBox(d.box, imgSize.w, imgSize.h)
+        : null,
+  }));
+
+  // Each zone listed once, in shelf order (A1..C5).
+  const affectedZones = [
+    ...new Set(finalDetections.map((d) => d.zone).filter(Boolean)),
+  ].sort();
 
   const startCamera = async () => {
     setError("");
@@ -374,6 +411,16 @@ export default function LiveCameraMonitor() {
         <div className="image-result-layout analyzed">
           <div className="image-section">
             <h3>Captured Frame</h3>
+
+            <label className="zone-toggle">
+              <input
+                type="checkbox"
+                checked={showZoneGrid}
+                onChange={(e) => setShowZoneGrid(e.target.checked)}
+              />
+              Show Shelf Zones
+            </label>
+
             <div style={{ position: "relative", display: "inline-block" }}>
               <img
                 src={capturedImage}
@@ -387,6 +434,22 @@ export default function LiveCameraMonitor() {
                 }
                 style={{ display: "block" }}
               />
+
+              {/* Visual-only zone grid so people can see how boxes map to zones */}
+              {showZoneGrid && (
+                <div className="zone-grid">
+                  {SHELF_ROWS.map((row) =>
+                    SHELF_COLUMNS.map((col) => (
+                      <div key={`${row}${col}`} className="zone-cell">
+                        <span className="zone-cell-label">
+                          {row}
+                          {col}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
 
               {imgSize.w > 0 &&
                 finalDetections.map((d, index) => {
@@ -403,6 +466,7 @@ export default function LiveCameraMonitor() {
                       }}
                     >
                       <span className="box-label">
+                        {d.zone ? `${d.zone} · ` : ""}
                         {d.class_name} {Number(d.confidence).toFixed(2)}
                       </span>
                     </div>
@@ -439,7 +503,8 @@ export default function LiveCameraMonitor() {
                   {finalDetections.map((d, index) => (
                     <div key={index} className="detection-item">
                       <div className="detection-title">
-                        {index + 1}. {d.class_name}
+                        {index + 1}. {d.zone ? `Zone ${d.zone} — ` : ""}
+                        {d.class_name}
                       </div>
                       <div className="confidence">
                         {Number(d.confidence).toFixed(2)} confidence
@@ -449,6 +514,28 @@ export default function LiveCameraMonitor() {
                 </div>
               </>
             )}
+
+            <h3>Affected Shelf Zones</h3>
+            <p>
+              Affected zones: <b>{affectedZones.length}</b>
+            </p>
+
+            {affectedZones.length > 0 ? (
+              <div className="zone-summary">
+                {affectedZones.map((zone) => (
+                  <span key={zone} className="zone-chip">
+                    {zone}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="safe">No empty zones in this frame 🟢</p>
+            )}
+
+            <p className="zone-note">
+              Zone mapping is estimated using the position of detected empty
+              spaces in the camera frame.
+            </p>
           </div>
         </div>
       )}
