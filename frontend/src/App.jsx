@@ -2,15 +2,16 @@ import { useEffect, useState } from "react";
 import "./App.css";
 import LiveCameraMonitor from "./components/LiveCameraMonitor";
 import DetectionUpload from "./components/DetectionUpload";
-
-const API_BASE_URL = "http://127.0.0.1:8000";
+import { API_BASE_URL } from "./services/detectionApi";
 
 export default function App() {
   const [connected, setConnected] = useState(null);
 
   const checkBackend = async () => {
     try {
-      await fetch(`${API_BASE_URL}/health`);
+      await fetch(`${API_BASE_URL}/health`, {
+        headers: { "ngrok-skip-browser-warning": "true" },
+      });
       setConnected(true);
     } catch {
       setConnected(false);
@@ -64,6 +65,11 @@ export default function App() {
           <li>The trained YOLO model scans the frame for empty shelf spaces.</li>
           <li>Empty spots are highlighted with boxes and listed in the report.</li>
         </ol>
+
+        <p className="zone-note">
+          Phone camera testing works best through an HTTPS tunnel — set
+          VITE_API_BASE_URL in frontend/.env.local to the backend tunnel URL.
+        </p>
       </div>
 
       {/* DEV FALLBACK: analyze a saved image instead of the camera */}

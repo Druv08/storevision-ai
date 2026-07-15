@@ -31,19 +31,13 @@ app.mount("/results", StaticFiles(directory=str(ANNOTATED_DIR)), name="results")
 # ----------------------------
 # CORS
 # ----------------------------
+# Development setup: allow any origin so the frontend also works from HTTPS
+# tunnel URLs and phone browsers. No cookies/credentials are used, so the
+# wildcard is safe for this local demo. Lock this down for real deployment.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "http://localhost:5175",
-        "http://127.0.0.1:5175",
-        "http://localhost:5176",
-        "http://127.0.0.1:5176",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

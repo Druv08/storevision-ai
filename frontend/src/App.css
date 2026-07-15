@@ -913,3 +913,393 @@ tbody tr:hover {
     font-style:italic;
     margin-bottom:0;
 }
+
+/* =========================
+   MISSING BOOK ALERTS
+========================= */
+
+.book-alert-list {
+    margin-bottom:12px;
+}
+
+.book-alert-list .suggestion-card {
+    flex:1 1 100%;
+    max-width:none;
+}
+
+.alert-confidence {
+    color:var(--muted);
+    font-size:13px;
+    margin:8px 0 0;
+}
+
+/* =========================
+   REFERENCE LAYOUT + ZONE STATUS
+========================= */
+
+.reference-controls {
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:15px;
+    margin-bottom:15px;
+    flex-wrap:wrap;
+}
+
+.reference-status {
+    color:var(--muted);
+}
+
+.reference-hint {
+    text-align:center;
+    color:var(--muted);
+    font-size:14px;
+    margin-top:-5px;
+    margin-bottom:15px;
+}
+
+/* Zone cells colored by comparison status */
+.zone-cell.zone-ok {
+    border:1px solid rgba(74,222,128,.5);
+}
+
+.zone-cell.zone-missing {
+    border:2px solid rgba(255,107,107,.9);
+    background:rgba(255,107,107,.14);
+}
+
+.zone-cell.zone-wrong {
+    border:2px solid rgba(192,132,252,.9);
+    background:rgba(192,132,252,.14);
+}
+
+.zone-cell.zone-changed {
+    border:2px solid rgba(250,204,21,.85);
+    background:rgba(250,204,21,.10);
+}
+
+.zone-cell.zone-unknown {
+    border:1px solid rgba(148,163,184,.6);
+    background:rgba(148,163,184,.07);
+}
+
+.reference-warning {
+    padding:10px 14px;
+    border-radius:12px;
+    background:rgba(250,204,21,.14);
+    border:1px solid rgba(250,204,21,.5);
+    color:#facc15;
+    font-size:14px;
+}
+
+/* Wrong-item alert cards */
+.suggestion-card.wrong-item {
+    border-left-color:#c084fc;
+}
+
+.badge-wrong {
+    background:rgba(192,132,252,.18);
+    color:#c084fc;
+}
+
+/* Zone analysis table */
+.zone-table-wrap {
+    overflow-x:auto;
+    margin-bottom:12px;
+}
+
+.zone-table {
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+}
+
+.zone-table th,
+.zone-table td {
+    padding:6px 10px;
+    text-align:left;
+    border-bottom:1px solid var(--border);
+    white-space:nowrap;
+}
+
+.zone-table th {
+    color:var(--muted);
+    text-transform:uppercase;
+    font-size:11px;
+    letter-spacing:.5px;
+}
+
+.zone-table td:nth-child(2),
+.zone-table td:nth-child(4) {
+    white-space:normal;
+    min-width:120px;
+}
+
+.zone-row-missing td {
+    color:#ff6b6b;
+}
+
+.zone-row-wrong td {
+    color:#c084fc;
+}
+
+.zone-row-changed td {
+    color:#facc15;
+}
+
+.zone-row-unknown td {
+    color:#94a3b8;
+}
+
+/* =========================
+   RECENT SHELF EVENTS
+========================= */
+
+.event-list {
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-bottom:12px;
+}
+
+.event-item {
+    padding:10px 14px;
+    border-radius:12px;
+    background:rgba(255,255,255,.06);
+    border:1px solid var(--border);
+    border-left:4px solid var(--muted);
+}
+
+.event-item.event-removal {
+    border-left-color:#ff6b6b;
+}
+
+.event-item.event-replacement {
+    border-left-color:#c084fc;
+}
+
+.event-item.event-restocked {
+    border-left-color:#4ade80;
+}
+
+.event-header {
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:4px;
+}
+
+.event-type {
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+}
+
+.event-removal .event-type { color:#ff6b6b; }
+.event-replacement .event-type { color:#c084fc; }
+.event-restocked .event-type { color:#4ade80; }
+
+.event-time {
+    font-size:12px;
+    color:var(--muted);
+}
+
+.event-message {
+    margin:0;
+    font-size:14px;
+    color:var(--ice);
+}
+
+/* =========================
+   ISSUE REVIEW PANEL
+========================= */
+
+.issue-panel {
+    margin-top:30px;
+}
+
+.issue-filters {
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:8px;
+    margin-bottom:18px;
+}
+
+.filter-chip {
+    padding:7px 14px;
+    border-radius:999px;
+    background:rgba(255,255,255,.07);
+    border:1px solid var(--border);
+    color:var(--muted);
+    cursor:pointer;
+    font-size:13px;
+}
+
+.filter-chip.active {
+    background:rgba(56,189,248,.2);
+    border-color:var(--sky);
+    color:var(--ice);
+    font-weight:600;
+}
+
+.issue-list {
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    margin-bottom:18px;
+    text-align:left;
+}
+
+.issue-card {
+    padding:16px 18px;
+    border-radius:14px;
+    background:rgba(255,255,255,.06);
+    border:1px solid var(--border);
+    border-left:5px solid var(--muted);
+}
+
+.issue-card.severity-high { border-left-color:#ff6b6b; }
+.issue-card.severity-medium { border-left-color:#facc15; }
+.issue-card.severity-low { border-left-color:#4ade80; }
+
+.issue-card-header {
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    gap:8px;
+    margin-bottom:8px;
+}
+
+.issue-card h3 {
+    margin:0 0 6px;
+    font-size:16px;
+}
+
+.issue-type-missing,
+.issue-type-suspicious_removal { background:rgba(255,107,107,.2); color:#ff6b6b; }
+.issue-type-wrong,
+.issue-type-possible_replacement { background:rgba(192,132,252,.18); color:#c084fc; }
+.issue-type-changed { background:rgba(250,204,21,.18); color:#facc15; }
+.issue-type-restocked { background:rgba(74,222,128,.18); color:#4ade80; }
+
+.issue-status-badge {
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.5px;
+    padding:3px 10px;
+    border-radius:999px;
+}
+
+.issue-status-badge.status-new { background:rgba(56,189,248,.2); color:var(--sky); }
+.issue-status-badge.status-reviewing { background:rgba(250,204,21,.18); color:#facc15; }
+.issue-status-badge.status-resolved { background:rgba(74,222,128,.18); color:#4ade80; }
+.issue-status-badge.status-false_alarm { background:rgba(148,163,184,.18); color:#94a3b8; }
+
+.issue-message {
+    margin:0 0 6px;
+    color:var(--ice);
+    font-size:14px;
+}
+
+.issue-meta {
+    margin:0 0 10px;
+    color:var(--muted);
+    font-size:12px;
+}
+
+.issue-actions {
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+}
+
+.issue-btn {
+    padding:8px 14px;
+    border-radius:10px;
+    background:rgba(255,255,255,.1);
+    border:1px solid var(--border);
+    color:var(--ice);
+    cursor:pointer;
+    font-size:13px;
+}
+
+.issue-btn.resolve {
+    background:rgba(74,222,128,.18);
+    border-color:rgba(74,222,128,.5);
+    color:#4ade80;
+}
+
+.issue-btn.dismiss {
+    background:rgba(148,163,184,.15);
+    border-color:rgba(148,163,184,.4);
+    color:#cbd5e1;
+}
+
+.issue-panel-actions {
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:12px;
+}
+
+/* =========================
+   MOBILE POLISH
+========================= */
+
+@media(max-width:640px){
+    .app {
+        padding:14px;
+    }
+
+    .camera-controls button,
+    .reference-controls button,
+    .issue-panel-actions button {
+        flex:1 1 45%;
+        padding:12px 8px;
+        font-size:14px;
+    }
+
+    .interval-label {
+        flex:1 1 100%;
+        justify-content:center;
+    }
+
+    .status-item {
+        min-width:42%;
+        padding:8px 10px;
+        flex:1 1 42%;
+    }
+
+    .camera-video {
+        max-width:100%;
+    }
+
+    .image-result-layout {
+        gap:20px;
+    }
+
+    .ai-result-panel {
+        width:100%;
+        max-width:100%;
+    }
+
+    .suggestion-card {
+        flex:1 1 100%;
+        max-width:none;
+    }
+
+    .zone-table {
+        font-size:11px;
+    }
+
+    .zone-table th,
+    .zone-table td {
+        padding:5px 6px;
+    }
+
+    .issue-actions .issue-btn {
+        flex:1 1 45%;
+    }
+}
