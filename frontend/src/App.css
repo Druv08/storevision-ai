@@ -56,9 +56,10 @@ body {
 
 /* MAIN */
 .app {
+    position:relative;
+    z-index: index 10;
     min-height:100vh;
-    padding:25px;
-    box-sizing:border-box;
+    padding: 30px;
 }
 
 /* HEADER */
@@ -158,14 +159,106 @@ body {
     font-family:"Cormorant Garamond",serif;
     font-size:32px;
 }
+.missing-book-section {
+  margin-top: 25px;
+}
+
+
+.missing-book-section h3 {
+  margin-bottom: 15px;
+}
+
+
+.missing-alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+
+.missing-alert-card {
+  padding: 15px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  border-left: 5px solid;
+}
+
+
+.missing-alert-card.high {
+  border-color: #ef4444;
+}
+
+
+.missing-alert-card.medium {
+  border-color: #f59e0b;
+}
+
+
+.missing-alert-card.low {
+  border-color: #22c55e;
+}
+
+.missing-alert-section {
+  margin-top: 25px;
+}
+
+
+.missing-alert {
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  background: rgba(255,255,255,0.08);
+}
+
+
+.missing-alert.high {
+  border-left: 5px solid red;
+}
+
+
+.missing-alert.medium {
+  border-left: 5px solid orange;
+}
+
+
+.missing-alert.low {
+  border-left: 5px solid green;
+}
+
+.alert-top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+
+.alert-priority {
+  font-weight: bold;
+}
+
+
+.alert-zone {
+  font-weight: bold;
+}
+
+
+.no-alerts {
+  opacity: 0.7;
+}
 
 /* UPLOAD SECTION */
 .upload-row {
+
     display:flex;
-    align-items:center;
+
     justify-content:center;
-    gap:15px;
-    width:100%;
+
+    align-items:center;
+
+    flex-wrap:wrap;
+
+    gap:20px;
+
 }
 
 .file-btn {
@@ -205,11 +298,11 @@ body {
 .image-result-layout {
     display:flex;
     justify-content:center;
-    align-items:center;
-    gap:45px;
+    align-items:flex-start;
+    gap:40px;
     width:100%;
-    margin-top:30px;
-    transition:0.4s ease;
+    margin-top:35px;
+    flex-wrap:wrap;
 }
 
 .image-result-layout:not(.analyzed) {
@@ -231,39 +324,95 @@ body {
     color:var(--ice);
 }
 
+.image-container {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.shelf-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.detection-box {
+  position: absolute;
+  border: 3px solid red;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.detection-box span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: red;
+  color: white;
+  padding: 4px 7px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  z-index: 11;
+}
+
 /* IMAGE BOX */
 .image-wrapper {
     position:relative;
     display:inline-block;
-    padding:10px;
+    padding:0;
     border-radius:22px;
+    overflow:hidden;
     background:rgba(255,255,255,0.05);
     border:1px solid var(--border);
+    box-shadow:
+    0 15px 40px rgba(0,0,0,.35);
 }
 
 /* IMAGE */
 .preview-image {
     display:block;
-    max-width:600px;
-    max-height:450px;
+    width:600px;
+    max-width:70vw;
+    max-height:500px;
     object-fit:contain;
-    border-radius:15px;
 }
 
 /* YOLO BOXES */
 .detection-box {
     position:absolute;
-    border:3px solid #22D3EE;
+    border:
+    3px solid #ff4d4d;
     border-radius:8px;
-    background:rgba(34,211,238,0.12);
+    background:
+    rgba(255,0,0,0.15);
+    box-shadow:
+    0 0 15px rgba(255,0,0,.7);
     pointer-events:none;
+}
+
+.detection-label {
+    position:absolute;
+    top:-28px;
+    left:0;
+    background:#ff4d4d;
+    color:white;
+    padding:4px 10px;
+    border-radius:8px;
+    font-size:12px;
+    font-weight:600;
+    white-space:nowrap;
 }
 
 /* REPORT CARD */
 .ai-result-panel {
-    width:340px;
+    width:360px;
+    display: block;
     padding:25px;
     border-radius:25px;
+    max-width:90vw;
     background:
     linear-gradient(
         145deg,
@@ -422,9 +571,13 @@ tbody tr:hover {
 @media(max-width:900px){
     .image-result-layout {
         flex-direction:column;
+        align-items:center;
     }
     .preview-image {
-        width:100%;
+        width:90vw;
+    }
+    .ai-result-panel {
+        width:90%;
     }
 }
 
@@ -636,38 +789,45 @@ tbody tr:hover {
     }
 }
 
-/* =========================
-   SMART SUGGESTIONS
-========================= */
-
-.suggestions-grid {
-    display:flex;
-    flex-wrap:wrap;
-    gap:20px;
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 20px;
+  flex-wrap: wrap;
 }
 
-.suggestion-card {
-    flex:1 1 260px;
-    max-width:340px;
-    padding:18px;
-    border-radius:16px;
-    background:rgba(255,255,255,.07);
-    border:1px solid var(--border);
-    border-left:5px solid #4ade80;
+
+.file-btn {
+  background: #001f4d;
+  color: white;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
 }
 
-.suggestion-card.priority-high {
-    border-left-color:#ff6b6b;
+
+.file-btn input {
+  display: none;
 }
 
-.suggestion-card.priority-medium {
-    border-left-color:#facc15;
+
+.file-name {
+  color: #9ecbff;
+  font-size: 14px;
 }
 
-.suggestion-card.priority-low {
-    border-left-color:#4ade80;
+
+.analyze-btn {
+  padding: 10px 22px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
 }
 
+<<<<<<< HEAD
 .priority-badge {
     font-size:12px;
     font-weight:700;
@@ -1359,3 +1519,5 @@ tbody tr:hover {
         flex:1 1 45%;
     }
 }
+=======
+>>>>>>> 67a7ea4 (Implement detection improvements and UI updates)

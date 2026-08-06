@@ -11,7 +11,17 @@ AI_MODEL_PATH = (
 
 sys.path.append(str(AI_MODEL_PATH))
 
-from inference import run_inference
+try:
+    from inference import run_inference
+except Exception:
+    import importlib.util
+    import os
+
+    inference_path = os.path.join(str(AI_MODEL_PATH), "inference.py")
+    spec = importlib.util.spec_from_file_location("inference", inference_path)
+    inference = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(inference)
+    run_inference = inference.run_inference
 
 def detect_empty_shelf(image_path):
 

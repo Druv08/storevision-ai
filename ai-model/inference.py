@@ -2,9 +2,10 @@ from ultralytics import YOLO
 import cv2
 import os
 
+from pathlib import Path
 
-MODEL_PATH = r"..\runs\detect\train-3\weights\best.pt"
-
+MODEL_PATH = r"..\runs\detect\train-5\weights\best.pt"
+print("Loading model from:", MODEL_PATH)
 model = YOLO(MODEL_PATH)
 
 

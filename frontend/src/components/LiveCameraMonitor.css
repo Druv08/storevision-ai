@@ -1,0 +1,31 @@
+.missing-book-section {
+  margin-top: 20px;
+}
+
+
+.book-alert {
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  background: #f5f5f5;
+}
+
+
+.book-alert h4 {
+  margin-top:0;
+}
+
+
+.book-alert.high {
+  border-left: 5px solid red;
+}
+
+
+.book-alert.medium {
+  border-left: 5px solid orange;
+}
+
+
+.book-alert.low {
+  border-left: 5px solid green;
+}

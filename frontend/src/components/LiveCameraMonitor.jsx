@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { detectShelfImage } from "../services/detectionApi";
+<<<<<<< HEAD
 import {
   buildDisplayDetections,
   captureReferenceSignature,
@@ -20,11 +21,146 @@ import {
 import IssueReviewPanel from "./IssueReviewPanel";
 
 const SHOW_REGIONS_DEFAULT = true;
+=======
+import { zonePlanogram } from "../config/zonePlanogram";
+
+// Display-only tuning (same values chosen in the Day 18/19 threshold tests).
+const DISPLAY_CONFIDENCE_THRESHOLD = 0.35; // hide weak/noisy boxes
+const IOU_SUPPRESSION_THRESHOLD = 0.4; // overlapping boxes above this are duplicates
+
+// Shelf zone grid: rows are shelf levels (A = top), columns split each level.
+const SHELF_ROWS = ["A", "B", "C"];
+const SHELF_COLUMNS = [1, 2, 3, 4, 5];
+const SHOW_ZONE_GRID_DEFAULT = true;
+
+// Intersection-over-Union of two boxes ({x1, y1, x2, y2}). Returns 0..1.
+function calculateIoU(boxA, boxB) {
+  const xLeft = Math.max(boxA.x1, boxB.x1);
+  const yTop = Math.max(boxA.y1, boxB.y1);
+  const xRight = Math.min(boxA.x2, boxB.x2);
+  const yBottom = Math.min(boxA.y2, boxB.y2);
+
+  if (xRight <= xLeft || yBottom <= yTop) {
+    return 0;
+  }
+
+  const intersection = (xRight - xLeft) * (yBottom - yTop);
+  const areaA = (boxA.x2 - boxA.x1) * (boxA.y2 - boxA.y1);
+  const areaB = (boxB.x2 - boxB.x1) * (boxB.y2 - boxB.y1);
+  const union = areaA + areaB - intersection;
+
+  return union > 0 ? intersection / union : 0;
+}
+
+// Simple non-max suppression: keep the strongest box, drop near-duplicates.
+function removeDuplicateDetections(detections) {
+  const sorted = [...detections].sort((a, b) => b.confidence - a.confidence);
+  const kept = [];
+  for (const det of sorted) {
+    const overlapsKept = kept.some(
+      (k) => calculateIoU(det.box, k.box) > IOU_SUPPRESSION_THRESHOLD,
+    );
+    if (!overlapsKept) {
+      kept.push(det);
+    }
+  }
+  return kept;
+}
+
+// Are two boxes probably the same shelf gap, even if IoU is low?
+function areBoxesNearSameGap(boxA, boxB) {
+  const heightA = boxA.y2 - boxA.y1;
+  const heightB = boxB.y2 - boxB.y1;
+  const avgHeight = (heightA + heightB) / 2;
+  const avgWidth = (boxA.x2 - boxA.x1 + (boxB.x2 - boxB.x1)) / 2;
+
+  const centerAy = (boxA.y1 + boxA.y2) / 2;
+  const centerBy = (boxB.y1 + boxB.y2) / 2;
+  const verticalCentersClose = Math.abs(centerAy - centerBy) <= avgHeight * 0.6;
+
+  const overlapY = Math.min(boxA.y2, boxB.y2) - Math.max(boxA.y1, boxB.y1);
+  const verticalOverlapOk =
+    overlapY > 0 && overlapY >= Math.min(heightA, heightB) * 0.4;
+
+  const horizontalGap = Math.max(boxA.x1, boxB.x1) - Math.min(boxA.x2, boxB.x2);
+  const horizontallyClose = horizontalGap <= avgWidth * 0.5;
+
+  return verticalCentersClose && verticalOverlapOk && horizontallyClose;
+}
+
+// Merge boxes that belong to the same empty space into one bigger box.
+function mergeNearbyDetections(detections) {
+  const sorted = [...detections].sort((a, b) => b.confidence - a.confidence);
+  const used = new Array(sorted.length).fill(false);
+  const merged = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    if (used[i]) continue;
+
+    let { x1, y1, x2, y2 } = sorted[i].box;
+    let bestConfidence = sorted[i].confidence;
+    used[i] = true;
+
+    let grew = true;
+    while (grew) {
+      grew = false;
+      const groupBox = { x1, y1, x2, y2 };
+      for (let j = 0; j < sorted.length; j++) {
+        if (used[j]) continue;
+        if (areBoxesNearSameGap(groupBox, sorted[j].box)) {
+          x1 = Math.min(x1, sorted[j].box.x1);
+          y1 = Math.min(y1, sorted[j].box.y1);
+          x2 = Math.max(x2, sorted[j].box.x2);
+          y2 = Math.max(y2, sorted[j].box.y2);
+          bestConfidence = Math.max(bestConfidence, sorted[j].confidence);
+          used[j] = true;
+          grew = true;
+        }
+      }
+    }
+
+    merged.push({
+      class_name: "Empty-space",
+      confidence: bestConfidence,
+      box: { x1, y1, x2, y2 },
+    });
+  }
+
+  return merged;
+}
+
+// Map a detection box to a shelf zone like "B3" using the box center.
+// Must be given the ORIGINAL image size, not the displayed (scaled) size.
+function getZoneForBox(box, imageWidth, imageHeight) {
+  const centerX = (box.x1 + box.x2) / 2;
+  const centerY = (box.y1 + box.y2) / 2;
+
+  const colIndex = Math.min(
+    SHELF_COLUMNS.length - 1,
+    Math.max(0, Math.floor((centerX / imageWidth) * SHELF_COLUMNS.length)),
+  );
+
+  const rowIndex = Math.min(
+    SHELF_ROWS.length - 1,
+    Math.max(0, Math.floor((centerY / imageHeight) * SHELF_ROWS.length)),
+  );
+
+  return `${SHELF_ROWS[rowIndex]}${SHELF_COLUMNS[colIndex]}`;
+}
+>>>>>>> 67a7ea4 (Implement detection improvements and UI updates)
+
+function getPriority(confidence) {
+  if (confidence >= 0.6) return "High";
+
+  if (confidence >= 0.4) return "Medium";
+
+  return "Low";
+}
 
 export default function LiveCameraMonitor() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const intervalRef = useRef(null);   // auto-scan timer
+  const intervalRef = useRef(null); // auto-scan timer
   const isScanningRef = useRef(false); // prevents two scans at the same time
   const referenceRef = useRef(null);   // reference visible to the scan timer
 
@@ -43,6 +179,7 @@ export default function LiveCameraMonitor() {
   const [scanCount, setScanCount] = useState(0);
   const [showRegions, setShowRegions] = useState(SHOW_REGIONS_DEFAULT);
 
+<<<<<<< HEAD
   // Reference layout (a saved photo of the correct arrangement) and the
   // change analysis of the latest scan against it.
   const [reference, setReference] = useState(() => loadReference());
@@ -102,6 +239,48 @@ export default function LiveCameraMonitor() {
       }
     }
   };
+=======
+  // Final display pipeline: filter weak boxes, drop duplicates, merge gaps,
+  // then tag each remaining detection with its shelf zone (A1..C5).
+  const confidentDetections =
+    result?.detections?.filter(
+      (d) => d.confidence >= DISPLAY_CONFIDENCE_THRESHOLD,
+    ) ?? [];
+  const finalDetections = mergeNearbyDetections(
+    removeDuplicateDetections(confidentDetections),
+  ).map((d) => ({
+    ...d,
+    zone:
+      imgSize.w > 0 && imgSize.h > 0
+        ? getZoneForBox(d.box, imgSize.w, imgSize.h)
+        : null,
+  }));
+
+  // Each zone listed once, in shelf order (A1..C5).
+  const affectedZones = [
+    ...new Set(finalDetections.map((d) => d.zone).filter(Boolean)),
+  ].sort((a, b) => {
+    const rowA = a.charCodeAt(0);
+    const rowB = b.charCodeAt(0);
+    if (rowA !== rowB) return rowA - rowB;
+
+    return Number(a[1]) - Number(b[1]);
+  });
+
+  const missingBookAlerts = affectedZones.map((zone) => {
+    const detection = finalDetections.find((d) => d.zone === zone);
+
+    const confidence = detection?.confidence || 0;
+
+    return {
+      zone,
+      expectedBook: zonePlanogram[zone] || "Unknown book",
+      confidence,
+      priority: getPriority(confidence),
+      message: `${zonePlanogram[zone]} may be missing from Zone ${zone}`,
+    };
+  });
+>>>>>>> 67a7ea4 (Implement detection improvements and UI updates)
 
   const startCamera = async () => {
     setError("");
@@ -109,7 +288,11 @@ export default function LiveCameraMonitor() {
     // Camera API only exists on secure pages (localhost and HTTPS count).
     if (!navigator.mediaDevices?.getUserMedia) {
       setError(
+<<<<<<< HEAD
         "Camera API not available in this browser. Open the site via HTTPS (tunnel link) or http://localhost:5175."
+=======
+        "Camera API not available in this browser. Open the site via http://localhost:5175 in Chrome or Edge.",
+>>>>>>> 67a7ea4 (Implement detection improvements and UI updates)
       );
       return;
     }
@@ -226,7 +409,9 @@ export default function LiveCameraMonitor() {
     try {
       // If the camera has not delivered a frame yet, the video size is 0.
       if (!video.videoWidth || !video.videoHeight) {
-        throw new Error("Camera is still starting - wait a second and try again");
+        throw new Error(
+          "Camera is still starting - wait a second and try again",
+        );
       }
 
       // Draw the current video frame onto the hidden canvas.
@@ -237,18 +422,35 @@ export default function LiveCameraMonitor() {
       // Turn the canvas into an image file the backend can accept.
       // Nothing is saved to disk - it all stays in browser memory.
       const blob = await new Promise((resolve) =>
-        canvas.toBlob(resolve, "image/jpeg", 0.9)
+        canvas.toBlob(resolve, "image/jpeg", 0.9),
       );
       if (!blob) {
         throw new Error("Could not capture a frame from the camera");
       }
       const file = new File([blob], "camera_frame.jpg", { type: "image/jpeg" });
 
+      const data = await detectShelfImage(file);
+      alert("Detection API returned successfully");
+
+      console.log("RAW DATA FROM API:", data);
+      console.log("FULL JSON:", JSON.stringify(data, null, 2));
+      console.log("AI RESULT:", JSON.stringify(data, null, 2));
+      setResult(data);
+
+      setResult({
+        ...data,
+        message:
+          data.detection_count > 0
+            ? "Empty shelf space detected"
+            : "No empty spaces detected",
+      });
+
       setCapturedImage((old) => {
-        if (old) URL.revokeObjectURL(old); // free the previous frame's memory
+        if (old) URL.revokeObjectURL(old);
         return URL.createObjectURL(blob);
       });
 
+<<<<<<< HEAD
       const data = await detectShelfImage(file);
       setResult(data);
 
@@ -281,13 +483,15 @@ export default function LiveCameraMonitor() {
         setAnalysis(null);
       }
 
+=======
+>>>>>>> 67a7ea4 (Implement detection improvements and UI updates)
       setScanCount((count) => count + 1);
       setLastScanTime(
         new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
-        })
+        }),
       );
     } catch (err) {
       // Show the error but keep monitoring alive - the next tick may succeed.
@@ -313,7 +517,10 @@ export default function LiveCameraMonitor() {
   };
 
   const latestResultText = result
-    ? result.message
+    ? result.message ||
+      (result.detection_count > 0
+        ? "Empty shelf space detected"
+        : "Shelf looks normal")
     : "No scans yet";
 
   return (
@@ -495,6 +702,7 @@ export default function LiveCameraMonitor() {
                 style={{ display: "block" }}
               />
 
+<<<<<<< HEAD
               {/* Changed regions from the reference comparison */}
               {showRegions &&
                 regions &&
@@ -515,6 +723,23 @@ export default function LiveCameraMonitor() {
                     </span>
                   </div>
                 ))}
+=======
+              {/* Visual-only zone grid so people can see how boxes map to zones */}
+              {showZoneGrid && (
+                <div className="zone-grid">
+                  {SHELF_ROWS.map((row) =>
+                    SHELF_COLUMNS.map((col) => (
+                      <div key={`${row}${col}`} className="zone-cell">
+                        <span className="zone-cell-label">
+                          {row}
+                          {col}
+                        </span>
+                      </div>
+                    )),
+                  )}
+                </div>
+              )}
+>>>>>>> 67a7ea4 (Implement detection improvements and UI updates)
 
               {/* YOLO empty-space boxes (supporting evidence) */}
               {imgSize.w > 0 &&
@@ -532,7 +757,12 @@ export default function LiveCameraMonitor() {
                       }}
                     >
                       <span className="box-label">
+<<<<<<< HEAD
                         {d.class_name} {Number(d.confidence).toFixed(2)}
+=======
+                        {d.zone ? `${d.zone} · ` : ""}
+                        {d.class_name} {(d.confidence * 100).toFixed(1)}%
+>>>>>>> 67a7ea4 (Implement detection improvements and UI updates)
                       </span>
                     </div>
                   );
@@ -541,8 +771,10 @@ export default function LiveCameraMonitor() {
           </div>
 
           <div className="ai-result-panel">
-            <h2>Detection Report</h2>
+            <div className="report-header">
+              <h2>AI Detection Report</h2>
 
+<<<<<<< HEAD
             <div className="report-status">
               <p>{result.message}</p>
 
@@ -772,6 +1004,96 @@ export default function LiveCameraMonitor() {
               evidence. The system reports areas, not item names — it does
               not read titles or labels.
             </p>
+=======
+              <span
+                className={result.issue_detected ? "alert-badge" : "safe-badge"}
+              >
+                {result.issue_detected ? "Issue Found" : "Shelf Normal"}
+              </span>
+            </div>
+
+            <div className="report-summary">
+              <div className="summary-card">
+                <span>Detections</span>
+                <b>{finalDetections.length}</b>
+              </div>
+
+              <div className="summary-card">
+                <span>Raw Results</span>
+                <b>{result.detection_count}</b>
+              </div>
+
+              <div className="summary-card">
+                <span>Status</span>
+                <b>{result.issue_detected ? "Empty Space" : "Normal"}</b>
+              </div>
+            </div>
+            {/* MISSING BOOK ALERTS */}
+            <div className="missing-book-section">
+              <h3>Possible Missing Book Alerts</h3>
+
+              {missingBookAlerts.length > 0 ? (
+                <div className="missing-alert-list">
+                  {missingBookAlerts.map((alert, index) => (
+                    <div
+                      key={index}
+                      className={`missing-alert-card ${alert.priority.toLowerCase()}`}
+                    >
+                      <div className="alert-top">
+                        <span className="alert-priority">
+                          {alert.priority} PRIORITY
+                        </span>
+
+                        <span className="alert-zone">Zone {alert.zone}</span>
+                      </div>
+
+                      <p>
+                        <strong>Expected book:</strong> {alert.expectedBook}
+                      </p>
+
+                      <p>{alert.message}</p>
+
+                      <small>
+                        Confidence: {(alert.confidence * 100).toFixed(1)}%
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="no-alerts">
+                  No missing book alerts from the latest scan.
+                </p>
+              )}
+            </div>
+            <div className="missing-alert-section">
+              <h3>Possible Missing Book Alerts</h3>
+
+              {missingBookAlerts.length > 0 ? (
+                missingBookAlerts.map((alert, index) => (
+                  <div
+                    key={index}
+                    className={`missing-alert ${alert.priority.toLowerCase()}`}
+                  >
+                    <h4>{alert.priority} Priority</h4>
+
+                    <p>
+                      <b>Zone:</b> {alert.zone}
+                    </p>
+
+                    <p>
+                      <b>Expected Book:</b> {alert.expectedBook}
+                    </p>
+
+                    <p>{alert.message}</p>
+
+                    <p>Confidence: {(alert.confidence * 100).toFixed(1)}%</p>
+                  </div>
+                ))
+              ) : (
+                <p>No possible missing books detected.</p>
+              )}
+            </div>
+>>>>>>> 67a7ea4 (Implement detection improvements and UI updates)
           </div>
         </div>
       )}

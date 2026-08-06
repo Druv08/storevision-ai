@@ -1,0 +1,53 @@
+.ai-network {
+
+    position: fixed;
+
+    inset: 0;
+
+    width:100vw;
+    height:100vh;
+
+    pointer-events:none;
+
+    z-index:5;
+
+}
+
+
+.network-node {
+
+    position:absolute;
+
+    width:8px;
+    height:8px;
+
+    background:#38BDF8;
+
+    border-radius:50%;
+
+    transform:translate(-50%,-50%);
+
+
+    box-shadow:
+    0 0 10px #38BDF8,
+    0 0 25px #22D3EE;
+
+
+    animation:pulse 2s infinite alternate;
+
+}
+
+
+@keyframes pulse {
+
+    from {
+        opacity:.3;
+        scale:1;
+    }
+
+    to {
+        opacity:1;
+        scale:2;
+    }
+
+}

@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import "./App.css";
 import LiveCameraMonitor from "./components/LiveCameraMonitor";
 import DetectionUpload from "./components/DetectionUpload";
+<<<<<<< HEAD
 import { API_BASE_URL } from "./services/detectionApi";
+=======
+
+const API_BASE_URL = "http://127.0.0.1:8001";
+>>>>>>> 67a7ea4 (Implement detection improvements and UI updates)
 
 export default function App() {
   const [connected, setConnected] = useState(null);

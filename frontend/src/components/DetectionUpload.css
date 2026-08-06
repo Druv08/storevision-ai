@@ -1,0 +1,26 @@
+.image-container {
+  position: relative;
+  width: 400px;
+}
+
+.shelf-image {
+  display: block;
+}
+
+.detection-box {
+  position: absolute;
+  border: 2px solid red;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.detection-box span {
+  position: absolute;
+  top: -18px;
+  left: 0;
+  background: red;
+  color: white;
+  font-size: 12px;
+  padding: 2px 5px;
+  white-space: nowrap;
+}

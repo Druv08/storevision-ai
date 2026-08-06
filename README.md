@@ -32,12 +32,12 @@ local and Git-ignored. The backend + frontend MVP remains stable.
 
 Final training metrics (20 epochs, empty-shelf validation set):
 
-| Metric | Value |
-|--------|-------|
+| Metric    | Value |
+| --------- | ----- |
 | Precision | 0.607 |
-| Recall | 0.542 |
-| mAP50 | 0.575 |
-| mAP50-95 | 0.245 |
+| Recall    | 0.542 |
+| mAP50     | 0.575 |
+| mAP50-95  | 0.245 |
 
 ### Day 13
 
@@ -101,7 +101,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-API available at `http://127.0.0.1:8000`.
+API available at `http://127.0.0.1:8001`.
 
 ### 2. Frontend (React + Vite)
 
@@ -121,7 +121,7 @@ Dashboard available at `http://localhost:5173` (or the next free port).
 ## API Routes
 
 | Method | Route             | Description                                  |
-|--------|-------------------|----------------------------------------------|
+| ------ | ----------------- | -------------------------------------------- |
 | GET    | `/`               | Backend running message                      |
 | GET    | `/health`         | Health / status check                        |
 | GET    | `/products`       | List of demo products                        |
@@ -134,13 +134,13 @@ Dashboard available at `http://localhost:5173` (or the next free port).
 
 ## Alert Types
 
-| Type              | Severity | Trigger                                  |
-|-------------------|----------|------------------------------------------|
-| `missing_item`    | high     | Expected product not detected in a slot  |
-| `wrong_placement` | medium   | A different product is in the slot       |
-| `expired_product` | critical | Product past its expiry date             |
-| `near_expiry`     | low      | Product expires within 7 days            |
-| `old_stock`       | low      | Product on shelf longer than 10 days     |
+| Type              | Severity | Trigger                                 |
+| ----------------- | -------- | --------------------------------------- |
+| `missing_item`    | high     | Expected product not detected in a slot |
+| `wrong_placement` | medium   | A different product is in the slot      |
+| `expired_product` | critical | Product past its expiry date            |
+| `near_expiry`     | low      | Product expires within 7 days           |
+| `old_stock`       | low      | Product on shelf longer than 10 days    |
 
 ## Next Steps (Day 11 onward)
 
