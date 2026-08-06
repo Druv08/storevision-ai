@@ -1,21 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { detectShelfImage } from "../services/detectionApi";
-import { zonePlanogram } from "../config/zonePlanogram";
 import {
-  SHELF_ROWS,
-  SHELF_COLUMNS,
-  getZoneForBox,
   buildDisplayDetections,
-  getZoneConfidence,
-  getAlertPriority,
-  createZoneSignatures,
-  analyzeZonesAgainstReference,
-  buildZoneAlerts,
-  detectZoneEvents,
+  captureReferenceSignature,
+  analyzeCurrentAgainstReference,
+  buildReferenceAlerts,
+  detectReferenceEvents,
   loadReference,
   saveReference,
   clearStoredReference,
-} from "../utils/zoneAnalysis";
+} from "../utils/referenceImageAnalysis";
 import {
   loadIssues,
   saveIssues,
@@ -25,7 +19,7 @@ import {
 } from "../utils/issueHistory";
 import IssueReviewPanel from "./IssueReviewPanel";
 
-const SHOW_ZONE_GRID_DEFAULT = true;
+const SHOW_REGIONS_DEFAULT = true;
 
 export default function LiveCameraMonitor() {
   const videoRef = useRef(null);
@@ -47,15 +41,16 @@ export default function LiveCameraMonitor() {
   const [scanIntervalSeconds, setScanIntervalSeconds] = useState(5);
   const [lastScanTime, setLastScanTime] = useState(null);
   const [scanCount, setScanCount] = useState(0);
-  const [showZoneGrid, setShowZoneGrid] = useState(SHOW_ZONE_GRID_DEFAULT);
+  const [showRegions, setShowRegions] = useState(SHOW_REGIONS_DEFAULT);
 
-  // Reference layout (correct shelf) + per-zone comparison of the last scan.
+  // Reference layout (a saved photo of the correct arrangement) and the
+  // change analysis of the latest scan against it.
   const [reference, setReference] = useState(() => loadReference());
-  const [zoneAnalysis, setZoneAnalysis] = useState(null);
+  const [analysis, setAnalysis] = useState(null);
 
   // Change-over-time tracking: the last trustworthy scan and recent events
-  // (sudden removals, possible replacements, restocks) between scans.
-  const lastStableAnalysisRef = useRef(null); // previous zone analysis
+  // (sudden removals, movements, restores) between scans.
+  const lastStableAnalysisRef = useRef(null);
   const [changeEvents, setChangeEvents] = useState([]);
 
   // Persistent issue history for the manager review workflow.
@@ -70,56 +65,25 @@ export default function LiveCameraMonitor() {
     referenceRef.current = reference;
   }, [reference]);
 
-  // Display pipeline for the box overlay, tagged with shelf zones.
-  const finalDetections = buildDisplayDetections(result?.detections).map(
-    (d) => ({
-      ...d,
-      zone:
-        imgSize.w > 0 && imgSize.h > 0
-          ? getZoneForBox(d.box, imgSize.w, imgSize.h)
-          : null,
-    })
+  // YOLO display pipeline for the box overlay (supporting evidence).
+  const finalDetections = buildDisplayDetections(result?.detections);
+
+  // Region-level results for the latest scan (null until a reference is set).
+  const regions = analysis?.regions ?? null;
+  const referenceWarning = Boolean(analysis?.referenceMismatch);
+  const { missingAlerts, movedAlerts, changedAlerts } = buildReferenceAlerts(
+    analysis
   );
 
-  // Reference-based results for the latest scan (null until a reference is set).
-  const analysisRows = zoneAnalysis?.zones ?? null;
-  const analysisByZone = analysisRows
-    ? Object.fromEntries(analysisRows.map((row) => [row.zone, row]))
-    : null;
-  const { missingItemAlerts, wrongItemAlerts, changedZones, unclearZones, okZones } =
-    buildZoneAlerts(analysisRows ?? []);
-  const okZoneCount = okZones.length;
-
-  // The analyzer flags scans where the camera/reference clearly moved.
-  const referenceWarning = Boolean(zoneAnalysis?.referenceMismatch);
-
-  // Affected = strong statuses only (missing/wrong + confident changes).
-  // On a reference mismatch nothing is shown as a real alert.
-  const affectedZones = analysisRows
+  // Affected areas: strong statuses only. Nothing during a mismatch.
+  const affectedAreas = regions
     ? referenceWarning
       ? []
-      : [...missingItemAlerts, ...wrongItemAlerts, ...changedZones]
-          .map((row) => row.zone)
-          .sort()
-    : [...new Set(finalDetections.map((d) => d.zone).filter(Boolean))].sort();
-
-  // YOLO-only fallback alerts, used until a reference layout is set.
-  const fallbackMissingAlerts = analysisRows
-    ? []
-    : affectedZones
-        .map((zone) => {
-          const expectedItem = zonePlanogram[zone] || "Unknown item";
-          const confidence = getZoneConfidence(zone, finalDetections);
-
-          return {
-            zone,
-            expectedItem,
-            confidence,
-            priority: getAlertPriority(confidence),
-            message: `${expectedItem} may be missing from Zone ${zone}`,
-          };
-        })
-        .sort((a, b) => b.confidence - a.confidence);
+      : [...missingAlerts, ...movedAlerts, ...changedAlerts].map(
+          (r) => r.areaLabel
+        )
+    : [];
+  const uniqueAffectedAreas = [...new Set(affectedAreas)];
 
   // Open the camera with the requested facing mode. "ideal" (not "exact")
   // lets devices without a matching camera fall back to whatever they have.
@@ -212,7 +176,7 @@ export default function LiveCameraMonitor() {
     };
   }, [stream]);
 
-  // Capture the current camera frame as the correct shelf layout.
+  // Save the current camera frame as the correct reference layout.
   const setReferenceLayout = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -231,25 +195,17 @@ export default function LiveCameraMonitor() {
     canvas.height = video.videoHeight;
     canvas.getContext("2d").drawImage(video, 0, 0);
 
-    const newReference = {
-      savedAt: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }),
-      signatures: createZoneSignatures(canvas),
-    };
-
+    const newReference = captureReferenceSignature(canvas);
     setReference(newReference);
     saveReference(newReference);
-    setZoneAnalysis(null); // the old analysis compared against the old baseline
+    setAnalysis(null); // old analysis compared against the old baseline
     lastStableAnalysisRef.current = null; // events restart from the new baseline
     setChangeEvents([]);
   };
 
   const clearReferenceLayout = () => {
     setReference(null);
-    setZoneAnalysis(null);
+    setAnalysis(null);
     lastStableAnalysisRef.current = null;
     setChangeEvents([]);
     clearStoredReference();
@@ -296,40 +252,33 @@ export default function LiveCameraMonitor() {
       const data = await detectShelfImage(file);
       setResult(data);
 
-      // Zone-by-zone comparison against the saved reference layout.
+      // Compare the frame against the saved reference layout.
       const currentReference = referenceRef.current;
-      if (currentReference?.signatures) {
-        const currentSignatures = createZoneSignatures(canvas);
-        const analysis = analyzeZonesAgainstReference({
-          currentSignatures,
-          referenceSignatures: currentReference.signatures,
-          planogram: zonePlanogram,
-          detections: buildDisplayDetections(data.detections),
-          frameWidth: canvas.width,
-          frameHeight: canvas.height,
-        });
-        setZoneAnalysis(analysis);
+      if (currentReference?.image) {
+        const scanAnalysis = analyzeCurrentAgainstReference(
+          currentReference,
+          canvas,
+          buildDisplayDetections(data.detections)
+        );
+        setAnalysis(scanAnalysis);
 
-        // Change-over-time events: compare with the previous trustworthy
-        // scan. Mismatch scans are skipped so a camera bump does not create
-        // a wall of fake removal events or fake issues.
-        if (!analysis.referenceMismatch) {
+        // Change-over-time events + persistent issues. Mismatch scans are
+        // skipped so a camera bump does not create fake alerts.
+        if (!scanAnalysis.referenceMismatch) {
           const previous = lastStableAnalysisRef.current;
           let events = [];
           if (previous) {
-            events = detectZoneEvents(previous.zones, analysis.zones);
+            events = detectReferenceEvents(previous, scanAnalysis);
             if (events.length > 0) {
               setChangeEvents((old) => [...events, ...old].slice(0, 10));
             }
           }
-          lastStableAnalysisRef.current = analysis;
+          lastStableAnalysisRef.current = scanAnalysis;
 
-          // Persistent issue history: one active issue per real problem,
-          // no duplicate spam while the same zone stays broken.
-          setIssues((old) => syncIssuesFromScan(old, analysis.zones, events));
+          setIssues((old) => syncIssuesFromScan(old, scanAnalysis, events));
         }
       } else {
-        setZoneAnalysis(null);
+        setAnalysis(null);
       }
 
       setScanCount((count) => count + 1);
@@ -371,7 +320,8 @@ export default function LiveCameraMonitor() {
     <div className="glass-panel">
       <h2>Live Shelf Monitor</h2>
       <p className="monitor-subtitle">
-        Turn on the camera and scan the shelf for empty spaces.
+        Save a reference photo of the correct layout, then scan to find
+        missing or moved objects.
       </p>
 
       {/* CONTROLS */}
@@ -454,9 +404,9 @@ export default function LiveCameraMonitor() {
 
       {!reference && (
         <p className="reference-hint">
-          Stock the shelf correctly, start the camera, then click "Set
-          Reference Layout". Keep the camera in the same position for later
-          scans so zones line up.
+          Arrange the shelf/desk correctly, start the camera, then click "Set
+          Reference Layout". Any layout works — no fixed boxes. Keep the
+          camera in the same position for later scans.
         </p>
       )}
 
@@ -525,10 +475,10 @@ export default function LiveCameraMonitor() {
             <label className="zone-toggle">
               <input
                 type="checkbox"
-                checked={showZoneGrid}
-                onChange={(e) => setShowZoneGrid(e.target.checked)}
+                checked={showRegions}
+                onChange={(e) => setShowRegions(e.target.checked)}
               />
-              Show Shelf Zones
+              Show Changed Areas
             </label>
 
             <div style={{ position: "relative", display: "inline-block" }}>
@@ -545,28 +495,28 @@ export default function LiveCameraMonitor() {
                 style={{ display: "block" }}
               />
 
-              {/* Zone grid, colored by the reference comparison when available */}
-              {showZoneGrid && (
-                <div className="zone-grid">
-                  {SHELF_ROWS.map((row) =>
-                    SHELF_COLUMNS.map((col) => {
-                      const zoneId = `${row}${col}`;
-                      const zoneStatus = analysisByZone?.[zoneId]?.status;
-                      return (
-                        <div
-                          key={zoneId}
-                          className={`zone-cell${
-                            zoneStatus ? ` zone-${zoneStatus}` : ""
-                          }`}
-                        >
-                          <span className="zone-cell-label">{zoneId}</span>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
+              {/* Changed regions from the reference comparison */}
+              {showRegions &&
+                regions &&
+                !referenceWarning &&
+                regions.map((region) => (
+                  <div
+                    key={region.id}
+                    className={`region-box region-${region.status}`}
+                    style={{
+                      left: `${region.box.x1 * 100}%`,
+                      top: `${region.box.y1 * 100}%`,
+                      width: `${(region.box.x2 - region.box.x1) * 100}%`,
+                      height: `${(region.box.y2 - region.box.y1) * 100}%`,
+                    }}
+                  >
+                    <span className="region-label">
+                      {region.id} · {region.statusLabel}
+                    </span>
+                  </div>
+                ))}
 
+              {/* YOLO empty-space boxes (supporting evidence) */}
               {imgSize.w > 0 &&
                 finalDetections.map((d, index) => {
                   const { x1, y1, x2, y2 } = d.box;
@@ -582,7 +532,6 @@ export default function LiveCameraMonitor() {
                       }}
                     >
                       <span className="box-label">
-                        {d.zone ? `${d.zone} · ` : ""}
                         {d.class_name} {Number(d.confidence).toFixed(2)}
                       </span>
                     </div>
@@ -597,39 +546,32 @@ export default function LiveCameraMonitor() {
             <div className="report-status">
               <p>{result.message}</p>
 
-              {analysisRows ? (
+              {regions ? (
                 <>
                   {referenceWarning && (
                     <p className="reference-warning">
-                      ⚠ Many zones changed at once. The camera angle probably
-                      moved — re-set the reference layout from the same
-                      position.
+                      ⚠ Camera/reference mismatch detected. Re-set the
+                      reference layout from the same camera angle.
                     </p>
                   )}
                   <p>
                     Reference layout: <b>Set</b>
                   </p>
                   <p>
-                    Total zones: <b>{analysisRows.length}</b>
+                    Changed areas: <b>{referenceWarning ? "—" : regions.length}</b>
                   </p>
                   <p>
-                    OK zones: <b>{okZoneCount}</b>
+                    Frame changed:{" "}
+                    <b>{Math.round(analysis.changedFraction * 100)}%</b>
                   </p>
                   <p>
-                    Affected zones: <b>{affectedZones.length}</b>
+                    Possible missing objects: <b>{missingAlerts.length}</b>
                   </p>
                   <p>
-                    Possible missing items: <b>{missingItemAlerts.length}</b>
+                    Possible moved/replaced: <b>{movedAlerts.length}</b>
                   </p>
                   <p>
-                    Possible wrong/replaced items:{" "}
-                    <b>{wrongItemAlerts.length}</b>
-                  </p>
-                  <p>
-                    Changed zones needing review: <b>{changedZones.length}</b>
-                  </p>
-                  <p>
-                    Unclear zones: <b>{unclearZones.length}</b>
+                    Changed areas needing review: <b>{changedAlerts.length}</b>
                   </p>
                   <p>
                     YOLO raw detections: <b>{result.detection_count}</b>
@@ -647,12 +589,6 @@ export default function LiveCameraMonitor() {
                     Raw detections from backend: <b>{result.detection_count}</b>
                   </p>
                   <p>
-                    Affected zones: <b>{affectedZones.length}</b>
-                  </p>
-                  <p>
-                    Possible missing items: <b>{fallbackMissingAlerts.length}</b>
-                  </p>
-                  <p>
                     Issue detected:{" "}
                     {result.issue_detected ? (
                       <span className="danger">Yes</span>
@@ -661,153 +597,107 @@ export default function LiveCameraMonitor() {
                     )}
                   </p>
                   <p className="zone-note">
-                    Set a reference layout to enable zone-by-zone comparison —
-                    it catches missing items even when the detector misses a
-                    gap.
+                    Set a reference layout to enable change detection — the
+                    app will compare every scan against your saved photo of
+                    the correct arrangement.
                   </p>
                 </>
               )}
             </div>
 
-            {finalDetections.length > 0 && (
+            {regions && (
               <>
-                <h3>Detected Areas</h3>
-                <div className="detection-list">
-                  {finalDetections.map((d, index) => (
-                    <div key={index} className="detection-item">
-                      <div className="detection-title">
-                        {index + 1}. {d.zone ? `Zone ${d.zone} — ` : ""}
-                        {d.class_name}
-                      </div>
-                      <div className="confidence">
-                        {Number(d.confidence).toFixed(2)} confidence
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+                <h3>Changed Areas</h3>
 
-            <h3>Affected Shelf Zones</h3>
-            <p>
-              Affected zones: <b>{affectedZones.length}</b>
-            </p>
-
-            {referenceWarning ? (
-              <p className="zone-note">
-                Alerts are hidden for this scan because the reference/camera
-                seems to have moved. Re-set the reference layout, then scan
-                again.
-              </p>
-            ) : affectedZones.length > 0 ? (
-              <div className="zone-summary">
-                {affectedZones.map((zone) => (
-                  <span key={zone} className="zone-chip">
-                    {zone}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="safe">No affected zones in this frame 🟢</p>
-            )}
-
-            <h3>Possible Missing Item Alerts</h3>
-
-            {referenceWarning ? (
-              <p className="zone-note">
-                Hidden — re-set the reference layout first.
-              </p>
-            ) : (analysisRows ? missingItemAlerts : fallbackMissingAlerts)
-                .length > 0 ? (
-              <div className="suggestions-grid book-alert-list">
-                {(analysisRows ? missingItemAlerts : fallbackMissingAlerts).map(
-                  (alert) => {
-                    const priority = getAlertPriority(alert.confidence);
-                    return (
-                      <div
-                        key={alert.zone}
-                        className={`suggestion-card priority-${priority.toLowerCase()}`}
-                      >
-                        <span
-                          className={`priority-badge badge-${priority.toLowerCase()}`}
-                        >
-                          {priority.toUpperCase()} PRIORITY
-                        </span>
-
-                        <h3>Zone {alert.zone}</h3>
-
-                        <p className="suggestion-issue">
-                          Expected item: {alert.expectedItem}
-                        </p>
-
-                        <p className="suggestion-action">
-                          {alert.expectedItem} may be missing from Zone{" "}
-                          {alert.zone}
-                        </p>
-
-                        <p className="alert-confidence">
-                          Confidence: {Math.round(alert.confidence * 100)}%
-                        </p>
-                      </div>
-                    );
-                  }
+                {referenceWarning ? (
+                  <p className="zone-note">
+                    Alerts are hidden for this scan because the camera or
+                    reference seems to have moved. Re-set the reference
+                    layout, then scan again.
+                  </p>
+                ) : uniqueAffectedAreas.length > 0 ? (
+                  <div className="zone-summary">
+                    {uniqueAffectedAreas.map((area) => (
+                      <span key={area} className="zone-chip">
+                        {area}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="safe">
+                    No changes compared to the reference 🟢
+                  </p>
                 )}
-              </div>
-            ) : (
-              <p className="safe">
-                No missing item alerts from the latest scan.
-              </p>
-            )}
 
-            {analysisRows && (
-              <>
-                <h3>Possible Wrong Item Alerts</h3>
+                <h3>Possible Missing Object Alerts</h3>
 
                 {referenceWarning ? (
                   <p className="zone-note">
                     Hidden — re-set the reference layout first.
                   </p>
-                ) : wrongItemAlerts.length > 0 ? (
+                ) : missingAlerts.length > 0 ? (
                   <div className="suggestions-grid book-alert-list">
-                    {wrongItemAlerts.map((alert) => (
+                    {missingAlerts.map((region) => (
                       <div
-                        key={alert.zone}
-                        className="suggestion-card wrong-item"
+                        key={region.id}
+                        className="suggestion-card priority-high"
                       >
-                        <span className="priority-badge badge-wrong">
-                          {alert.isSwapPair
-                            ? "POSSIBLE SWAP"
-                            : "POSSIBLE WRONG ITEM"}
+                        <span className="priority-badge badge-high">
+                          POSSIBLE MISSING OBJECT
                         </span>
 
-                        <h3>Zone {alert.zone}</h3>
+                        <h3>
+                          {region.id} — {region.areaLabel} area
+                        </h3>
 
-                        <p className="suggestion-issue">
-                          Expected item: {alert.expectedItem}
-                        </p>
-
-                        <p className="suggestion-action">
-                          Zone {alert.zone} may contain the wrong item. It
-                          looks like {alert.matchedItem} from Zone{" "}
-                          {alert.matchedZone}.
-                        </p>
-
-                        {alert.isSwapPair && (
-                          <p className="suggestion-issue">
-                            Zones {alert.zone} and {alert.matchedZone} appear
-                            to have exchanged items.
-                          </p>
-                        )}
+                        <p className="suggestion-action">{region.message}</p>
 
                         <p className="alert-confidence">
-                          Match score: {Math.round(alert.confidence * 100)}%
+                          Confidence: {Math.round(region.confidence * 100)}%
                         </p>
                       </div>
                     ))}
                   </div>
                 ) : (
                   <p className="safe">
-                    No wrong item alerts from the latest scan.
+                    No missing object alerts from the latest scan.
+                  </p>
+                )}
+
+                <h3>Possible Moved/Replaced Object Alerts</h3>
+
+                {referenceWarning ? (
+                  <p className="zone-note">
+                    Hidden — re-set the reference layout first.
+                  </p>
+                ) : movedAlerts.length > 0 ? (
+                  <div className="suggestions-grid book-alert-list">
+                    {movedAlerts.map((region) => (
+                      <div
+                        key={region.id}
+                        className="suggestion-card wrong-item"
+                      >
+                        <span className="priority-badge badge-wrong">
+                          {region.status === "swapped"
+                            ? "POSSIBLE SWAP"
+                            : "POSSIBLE MOVED OBJECT"}
+                        </span>
+
+                        <h3>
+                          {region.id} — {region.areaLabel} area
+                        </h3>
+
+                        <p className="suggestion-action">{region.message}</p>
+
+                        <p className="alert-confidence">
+                          Match score: {Math.round(region.confidence * 100)}%
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="safe">
+                    No moved/replaced object alerts from the latest scan.
                   </p>
                 )}
 
@@ -817,7 +707,7 @@ export default function LiveCameraMonitor() {
                   <div className="event-list">
                     {changeEvents.map((event, index) => (
                       <div
-                        key={`${event.zone}-${event.time}-${index}`}
+                        key={`${event.areaLabel}-${event.time}-${index}`}
                         className={`event-item event-${event.type}`}
                       >
                         <div className="event-header">
@@ -830,46 +720,57 @@ export default function LiveCameraMonitor() {
                   </div>
                 ) : (
                   <p className="safe">
-                    No shelf events yet — events appear when a zone's status
+                    No shelf events yet — events appear when an area's status
                     changes between scans.
                   </p>
                 )}
 
-                <h3>Zone Analysis</h3>
-                <div className="zone-table-wrap">
-                  <table className="zone-table">
-                    <thead>
-                      <tr>
-                        <th>Zone</th>
-                        <th>Expected item</th>
-                        <th>Status</th>
-                        <th>Matched item</th>
-                        <th>Matched zone</th>
-                        <th>Score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {analysisRows.map((row) => (
-                        <tr key={row.zone} className={`zone-row-${row.status}`}>
-                          <td>{row.zone}</td>
-                          <td>{row.expectedItem}</td>
-                          <td>{row.statusLabel}</td>
-                          <td>{row.matchedItem || "—"}</td>
-                          <td>{row.matchedZone || "—"}</td>
-                          <td>{Math.round(row.confidence * 100)}%</td>
+                <h3>Reference Change Analysis</h3>
+                {referenceWarning ? (
+                  <p className="zone-note">
+                    Analysis hidden — camera/reference mismatch.
+                  </p>
+                ) : regions.length > 0 ? (
+                  <div className="zone-table-wrap">
+                    <table className="zone-table">
+                      <thead>
+                        <tr>
+                          <th>Region</th>
+                          <th>Area</th>
+                          <th>Status</th>
+                          <th>Looks like area</th>
+                          <th>Score</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {regions.map((region) => (
+                          <tr
+                            key={region.id}
+                            className={`zone-row-${region.status}`}
+                          >
+                            <td>{region.id}</td>
+                            <td>{region.areaLabel}</td>
+                            <td>{region.statusLabel}</td>
+                            <td>{region.matchedAreaLabel || "—"}</td>
+                            <td>{Math.round(region.confidence * 100)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="safe">
+                    All areas match the reference layout 🟢
+                  </p>
+                )}
               </>
             )}
 
             <p className="zone-note">
-              Zone status is estimated by comparing each zone with the saved
-              reference layout, with empty-space detection as supporting
-              evidence. Item names come from the configured planogram — the
-              system does not read titles or labels.
+              Changes are estimated by comparing each scan with the saved
+              reference photo, with empty-space detection as supporting
+              evidence. The system reports areas, not item names — it does
+              not read titles or labels.
             </p>
           </div>
         </div>

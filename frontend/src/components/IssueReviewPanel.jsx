@@ -13,8 +13,8 @@ const FILTERS = [
   { id: "resolved", label: "Resolved" },
   { id: "false_alarm", label: "False Alarm" },
   { id: "missing", label: "Missing" },
-  { id: "wrong", label: "Wrong/Replaced" },
-  { id: "suspicious", label: "Suspicious Change" },
+  { id: "moved", label: "Moved/Swapped" },
+  { id: "changed", label: "Changed" },
 ];
 
 function matchesFilter(issue, filter) {
@@ -28,14 +28,10 @@ function matchesFilter(issue, filter) {
       return issue.status === filter;
     case "missing":
       return issue.type === "missing" || issue.type === "suspicious_removal";
-    case "wrong":
-      return issue.type === "wrong" || issue.type === "possible_replacement";
-    case "suspicious":
-      return (
-        issue.type === "suspicious_removal" ||
-        issue.type === "possible_replacement" ||
-        issue.type === "changed"
-      );
+    case "moved":
+      return issue.type === "moved" || issue.type === "swapped";
+    case "changed":
+      return issue.type === "changed";
     default:
       return true;
   }
@@ -96,16 +92,16 @@ export default function IssueReviewPanel({
           <span className="status-value">{stats.resolvedCount}</span>
         </div>
         <div className="status-item">
-          <span className="status-label">Missing items</span>
+          <span className="status-label">Missing objects</span>
           <span className="status-value">{stats.missingCount}</span>
         </div>
         <div className="status-item">
-          <span className="status-label">Wrong items</span>
-          <span className="status-value">{stats.wrongCount}</span>
+          <span className="status-label">Moved/Swapped</span>
+          <span className="status-value">{stats.movedCount}</span>
         </div>
         <div className="status-item">
-          <span className="status-label">Suspicious changes</span>
-          <span className="status-value">{stats.suspiciousCount}</span>
+          <span className="status-label">Changed areas</span>
+          <span className="status-value">{stats.changedCount}</span>
         </div>
         <div className="status-item">
           <span className="status-label">Last scan</span>
@@ -144,15 +140,16 @@ export default function IssueReviewPanel({
               </div>
 
               <h3>
-                Zone {issue.zone} — {issue.expectedItem}
+                {issue.areaLabel} area
+                {issue.regionId ? ` (${issue.regionId})` : ""}
               </h3>
 
               <p className="issue-message">{issue.message}</p>
 
               <p className="issue-meta">
                 {new Date(issue.timestamp).toLocaleString()}
-                {issue.matchedItem
-                  ? ` · looks like ${issue.matchedItem} (Zone ${issue.matchedZone})`
+                {issue.matchedAreaLabel
+                  ? ` · looks like the ${issue.matchedAreaLabel} area`
                   : ""}
                 {typeof issue.confidence === "number"
                   ? ` · score ${Math.round(issue.confidence * 100)}%`
@@ -191,7 +188,7 @@ export default function IssueReviewPanel({
       ) : (
         <p className="safe">
           {issues.length === 0
-            ? "No issues recorded yet — they appear here as the monitor finds problems."
+            ? "No issues recorded yet — they appear here as the monitor finds changes."
             : "No issues match this filter."}
         </p>
       )}

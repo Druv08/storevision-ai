@@ -47,8 +47,9 @@ export default function App() {
       <div className="welcome-box">
         <h2>AI-powered live shelf monitoring</h2>
         <p>
-          Point a camera at a store shelf and let the AI find empty spaces in
-          the current frame.
+          Save a reference photo of any shelf, desk, or product layout — the
+          app compares every scan against it and flags missing, moved, or
+          changed objects.
         </p>
       </div>
 
@@ -60,10 +61,10 @@ export default function App() {
         <h2>How it works</h2>
 
         <ol className="how-list">
-          <li>Start the camera and point it at a store shelf.</li>
-          <li>Click "Analyze Current Frame" to capture the live view.</li>
-          <li>The trained YOLO model scans the frame for empty shelf spaces.</li>
-          <li>Empty spots are highlighted with boxes and listed in the report.</li>
+          <li>Point the camera at any shelf, desk, or product layout.</li>
+          <li>Click "Set Reference Layout" while everything is placed correctly.</li>
+          <li>Scan or start monitoring — each frame is compared with the reference photo.</li>
+          <li>Changed areas are highlighted: possible missing, moved, or swapped objects.</li>
         </ol>
 
         <p className="zone-note">

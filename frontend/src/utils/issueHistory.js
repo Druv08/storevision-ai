@@ -1,17 +1,21 @@
 // Persistent shelf-issue history for the store-manager review workflow.
 //
-// Issues are derived from zone analysis results and change-over-time events,
-// stored in localStorage (text only - never image/frame data), deduplicated
-// so a problem that persists across many scans creates ONE active issue,
-// and reviewed by the manager (new -> reviewing -> resolved / false alarm).
+// Issues are derived from reference-image analysis regions and
+// change-over-time events, stored in localStorage (text only - never
+// image/frame data), deduplicated so a problem that persists across many
+// scans creates ONE active issue, and reviewed by the manager
+// (new -> reviewing -> resolved / false alarm).
+//
+// Generic by design: no fixed zones, no item names - issues describe AREAS
+// of the reference layout ("lower-right", "center-left").
 
 export const ISSUE_TYPE_LABELS = {
-  missing: "Possible missing item",
-  wrong: "Possible wrong item",
+  missing: "Possible missing object",
+  moved: "Possible moved object",
+  swapped: "Possible swap",
+  changed: "Changed area",
   suspicious_removal: "Suspicious removal",
-  possible_replacement: "Possible replacement",
-  restocked: "Restocked",
-  changed: "Suspicious shelf change",
+  restored: "Restored",
 };
 
 export const ISSUE_STATUS_LABELS = {
@@ -23,11 +27,12 @@ export const ISSUE_STATUS_LABELS = {
 
 const ACTIVE_STATUSES = ["new", "reviewing"];
 
-// An active issue of any of these types covers a zone status, so the same
+// An active issue of any of these types covers a region status, so the same
 // physical problem is not reported twice under two names.
 const COVERING_TYPES = {
   missing: ["missing", "suspicious_removal"],
-  wrong: ["wrong", "possible_replacement"],
+  moved: ["moved", "swapped"],
+  swapped: ["moved", "swapped"],
   changed: ["changed"],
 };
 
@@ -35,9 +40,9 @@ const MAX_ISSUES = 200; // keep localStorage small
 
 export function severityForType(type) {
   if (type === "missing" || type === "suspicious_removal") return "high";
-  if (type === "wrong" || type === "possible_replacement" || type === "changed")
-    return "medium";
-  return "low"; // restocked / informational
+  if (type === "moved" || type === "swapped") return "medium";
+  if (type === "changed") return "medium";
+  return "low"; // restored / informational
 }
 
 function makeId() {
@@ -49,89 +54,74 @@ function makeId() {
 }
 
 export function createIssue({
-  zone,
-  expectedItem,
+  regionId,
+  areaLabel,
   type,
   message,
-  matchedItem = null,
-  matchedZone = null,
+  matchedAreaLabel = null,
   confidence = null,
 }) {
   return {
     id: makeId(),
     timestamp: new Date().toISOString(),
-    zone,
-    expectedItem,
+    regionId,
+    areaLabel,
     type,
     severity: severityForType(type),
-    // Restock entries are informational - nothing for a manager to act on.
-    status: type === "restocked" ? "resolved" : "new",
+    // Restored entries are informational - nothing for a manager to act on.
+    status: type === "restored" ? "resolved" : "new",
     message,
-    matchedItem,
-    matchedZone,
+    matchedAreaLabel,
     confidence,
   };
 }
 
 // Merge one scan's results into the issue history.
-// - zones: rows from analyzeZonesAgainstReference (skip on reference mismatch)
-// - events: rows from detectZoneEvents (may be empty)
+// - analysis: result of analyzeCurrentAgainstReference (skip on mismatch)
+// - events: rows from detectReferenceEvents (may be empty)
 // Returns a NEW issues array (never mutates the input).
-export function syncIssuesFromScan(existingIssues, zones, events = []) {
+// Dedupe key: type group + areaLabel while an issue is still active.
+export function syncIssuesFromScan(existingIssues, analysis, events = []) {
   let issues = existingIssues.map((issue) => ({ ...issue }));
+  const regions = analysis?.regions ?? [];
 
   const isActive = (issue) => ACTIVE_STATUSES.includes(issue.status);
-  const hasActiveCovering = (zone, zoneStatus) =>
+  const hasActiveCovering = (areaLabel, type) =>
     issues.some(
       (issue) =>
         isActive(issue) &&
-        issue.zone === zone &&
-        (COVERING_TYPES[zoneStatus] || [zoneStatus]).includes(issue.type)
+        issue.areaLabel === areaLabel &&
+        (COVERING_TYPES[type] || [type]).includes(issue.type)
     );
 
-  // 1) Auto-resolve: a zone that reads OK again closes its active issues.
-  //    (A manager can still mark past issues as false alarms.)
-  const okZones = new Set(
-    zones.filter((row) => row.status === "ok").map((row) => row.zone)
-  );
+  // 1) Auto-resolve: an area with no changed region at all is back to normal.
+  const changedAreas = new Set(regions.map((r) => r.areaLabel));
   for (const issue of issues) {
-    if (isActive(issue) && okZones.has(issue.zone)) {
+    if (isActive(issue) && !changedAreas.has(issue.areaLabel)) {
       issue.status = "resolved";
     }
   }
 
   const created = [];
 
-  // 2) Transition events first - they carry the most meaning (a zone that
-  //    JUST became empty is a suspicious removal, not merely "missing").
+  // 2) Transition events first - a region that JUST became empty is a
+  //    suspicious removal, not merely "missing".
   for (const event of events) {
-    if (event.type === "removal" && !hasActiveCovering(event.zone, "missing")) {
+    if (event.type === "removal" && !hasActiveCovering(event.areaLabel, "missing")) {
       created.push(
         createIssue({
-          zone: event.zone,
-          expectedItem: event.expectedItem,
+          regionId: null,
+          areaLabel: event.areaLabel,
           type: "suspicious_removal",
           message: event.message,
         })
       );
-    } else if (
-      event.type === "replacement" &&
-      !hasActiveCovering(event.zone, "wrong")
-    ) {
+    } else if (event.type === "restored") {
       created.push(
         createIssue({
-          zone: event.zone,
-          expectedItem: event.expectedItem,
-          type: "possible_replacement",
-          message: event.message,
-        })
-      );
-    } else if (event.type === "restocked") {
-      created.push(
-        createIssue({
-          zone: event.zone,
-          expectedItem: event.expectedItem,
-          type: "restocked",
+          regionId: null,
+          areaLabel: event.areaLabel,
+          type: "restored",
           message: event.message,
         })
       );
@@ -140,33 +130,19 @@ export function syncIssuesFromScan(existingIssues, zones, events = []) {
   issues = [...created, ...issues];
   created.length = 0;
 
-  // 3) Zone statuses: one active issue per persisting problem.
-  for (const row of zones) {
-    if (!COVERING_TYPES[row.status]) continue; // ok / unknown are not issues
-    if (hasActiveCovering(row.zone, row.status)) continue;
-
-    let message;
-    if (row.status === "missing") {
-      message = `${row.expectedItem} may be missing from Zone ${row.zone}.`;
-    } else if (row.status === "wrong") {
-      message =
-        `Zone ${row.zone} may contain the wrong item` +
-        (row.matchedItem
-          ? ` — it looks like ${row.matchedItem} from Zone ${row.matchedZone}.`
-          : ".");
-    } else {
-      message = `Zone ${row.zone} appears changed and needs review.`;
-    }
+  // 3) Region statuses: one active issue per persisting problem.
+  for (const region of regions) {
+    if (!COVERING_TYPES[region.status]) continue;
+    if (hasActiveCovering(region.areaLabel, region.status)) continue;
 
     created.push(
       createIssue({
-        zone: row.zone,
-        expectedItem: row.expectedItem,
-        type: row.status,
-        message,
-        matchedItem: row.matchedItem ?? null,
-        matchedZone: row.matchedZone ?? null,
-        confidence: row.confidence ?? null,
+        regionId: region.id,
+        areaLabel: region.areaLabel,
+        type: region.status,
+        message: region.message,
+        matchedAreaLabel: region.matchedAreaLabel ?? null,
+        confidence: region.confidence ?? null,
       })
     );
   }
@@ -184,9 +160,7 @@ export function updateIssueStatus(issues, id, status) {
 export function computeIssueStats(issues) {
   const today = new Date().toDateString();
   const isMissingType = (t) => t === "missing" || t === "suspicious_removal";
-  const isWrongType = (t) => t === "wrong" || t === "possible_replacement";
-  const isSuspiciousType = (t) =>
-    t === "suspicious_removal" || t === "possible_replacement" || t === "changed";
+  const isMovedType = (t) => t === "moved" || t === "swapped";
 
   return {
     total: issues.length,
@@ -196,8 +170,8 @@ export function computeIssueStats(issues) {
     newCount: issues.filter((i) => i.status === "new").length,
     resolvedCount: issues.filter((i) => i.status === "resolved").length,
     missingCount: issues.filter((i) => isMissingType(i.type)).length,
-    wrongCount: issues.filter((i) => isWrongType(i.type)).length,
-    suspiciousCount: issues.filter((i) => isSuspiciousType(i.type)).length,
+    movedCount: issues.filter((i) => isMovedType(i.type)).length,
+    changedCount: issues.filter((i) => i.type === "changed").length,
   };
 }
 
@@ -210,12 +184,11 @@ export function buildIssueReportJson(issues) {
       totalIssues: issues.length,
       issues: issues.map((issue) => ({
         timestamp: issue.timestamp,
-        zone: issue.zone,
-        expectedItem: issue.expectedItem,
+        regionId: issue.regionId,
+        areaLabel: issue.areaLabel,
         type: issue.type,
         typeLabel: ISSUE_TYPE_LABELS[issue.type] || issue.type,
-        matchedItem: issue.matchedItem,
-        matchedZone: issue.matchedZone,
+        matchedAreaLabel: issue.matchedAreaLabel,
         severity: issue.severity,
         status: issue.status,
         message: issue.message,
@@ -235,7 +208,9 @@ export function loadIssues() {
   try {
     const raw = localStorage.getItem(ISSUE_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // Entries from the old fixed-zone format have no areaLabel - drop them.
+    return parsed.filter((issue) => typeof issue.areaLabel === "string");
   } catch {
     return [];
   }
