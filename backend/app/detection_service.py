@@ -12,16 +12,10 @@ from ultralytics import YOLO
 # Project root is two levels up from backend/app/ (app -> backend -> root).
 # Building the path this way avoids hardcoding absolute machine paths.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
 MODEL_PATH = (
-    Path(__file__)
-    .resolve()
-    .parents[2]
-    / "runs" 
-    / "detect" 
-    / "train-5"
-    / "weights" 
-    / "best.pt"
+    PROJECT_ROOT
+    / "ai-model" / "outputs" / "training-runs"
+    / "empty_shelf_yolov8n_day13" / "weights" / "best.pt"
 )
 
 CONFIDENCE = 0.25
@@ -52,13 +46,6 @@ def run_empty_shelf_detection(image_path: str, annotate_dir: str | None = None) 
     """
     model = get_model()
     results = model.predict(source=image_path, conf=CONFIDENCE, save=False, verbose=False)
-
-    print("YOLO RESULTS:", results)
-
-    print(
-        "NUMBER OF BOXES:",
-        len(results[0].boxes)
-    )
 
     detections = []
     if results:

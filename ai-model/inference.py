@@ -4,7 +4,10 @@ import os
 
 from pathlib import Path
 
-MODEL_PATH = r"..\runs\detect\train-5\weights\best.pt"
+MODEL_PATH = str(
+    Path(__file__).resolve().parent
+    / "outputs" / "training-runs" / "empty_shelf_yolov8n_day13" / "weights" / "best.pt"
+)
 print("Loading model from:", MODEL_PATH)
 model = YOLO(MODEL_PATH)
 

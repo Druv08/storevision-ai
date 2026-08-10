@@ -1,6 +1,7 @@
 // Frontend helper for the StoreVision AI smart-suggestions API.
-
-const API_BASE_URL = "http://127.0.0.1:8001";
+// Shares the backend base URL with the detection API so it also works behind
+// the dev-server proxy / tunnel (same-origin) instead of a hardcoded port.
+import { API_BASE_URL } from "./detectionApi";
 
 export async function fetchSmartSuggestions() {
   const response = await fetch(`${API_BASE_URL}/smart-suggestions`);

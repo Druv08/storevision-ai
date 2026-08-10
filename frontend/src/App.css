@@ -57,7 +57,7 @@ body {
 /* MAIN */
 .app {
     position:relative;
-    z-index: index 10;
+    z-index: 10;
     min-height:100vh;
     padding: 30px;
 }
@@ -827,7 +827,6 @@ tbody tr:hover {
   font-weight: 600;
 }
 
-<<<<<<< HEAD
 .priority-badge {
     font-size:12px;
     font-weight:700;
@@ -1519,5 +1518,3 @@ tbody tr:hover {
         flex:1 1 45%;
     }
 }
-=======
->>>>>>> 67a7ea4 (Implement detection improvements and UI updates)

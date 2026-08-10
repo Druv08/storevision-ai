@@ -1,0 +1,74 @@
+<svg width="420" height="300" viewBox="0 0 420 300" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AI smart shelf">
+  <defs>
+    <linearGradient id="ss-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0D1B2A"/>
+      <stop offset="1" stop-color="#07111F"/>
+    </linearGradient>
+    <linearGradient id="ss-item" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <radialGradient id="ss-glow" cx="0.5" cy="0.2" r="0.8">
+      <stop offset="0" stop-color="#22D3EE" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#22D3EE" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ss-beam" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22D3EE" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#22D3EE" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#22D3EE" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="420" height="300" rx="22" fill="url(#ss-bg)"/>
+  <rect x="0" y="0" width="420" height="300" rx="22" fill="url(#ss-glow)"/>
+
+  <!-- shelf frame -->
+  <g stroke="#38BDF8" stroke-opacity="0.55" stroke-width="3" fill="none">
+    <rect x="70" y="55" width="280" height="200" rx="10"/>
+    <line x1="70" y1="122" x2="350" y2="122"/>
+    <line x1="70" y1="189" x2="350" y2="189"/>
+  </g>
+
+  <!-- top shelf: items with one gap -->
+  <g>
+    <rect x="86" y="72" width="30" height="42" rx="4" fill="url(#ss-item)" fill-opacity="0.9"/>
+    <rect x="124" y="72" width="30" height="42" rx="4" fill="url(#ss-item)" fill-opacity="0.9"/>
+    <rect x="200" y="72" width="30" height="42" rx="4" fill="url(#ss-item)" fill-opacity="0.9"/>
+    <rect x="238" y="72" width="30" height="42" rx="4" fill="url(#ss-item)" fill-opacity="0.9"/>
+    <rect x="304" y="72" width="30" height="42" rx="4" fill="url(#ss-item)" fill-opacity="0.9"/>
+    <!-- gap outline -->
+    <rect x="162" y="72" width="30" height="42" rx="4" fill="none" stroke="#ff6b6b" stroke-opacity="0.8" stroke-dasharray="4 4"/>
+  </g>
+
+  <!-- middle shelf: full -->
+  <g fill="url(#ss-item)" fill-opacity="0.85">
+    <rect x="86" y="139" width="30" height="42" rx="4"/>
+    <rect x="124" y="139" width="30" height="42" rx="4"/>
+    <rect x="162" y="139" width="30" height="42" rx="4"/>
+    <rect x="200" y="139" width="30" height="42" rx="4"/>
+    <rect x="238" y="139" width="30" height="42" rx="4"/>
+    <rect x="276" y="139" width="30" height="42" rx="4"/>
+    <rect x="314" y="139" width="20" height="42" rx="4"/>
+  </g>
+
+  <!-- bottom shelf: items with one gap -->
+  <g>
+    <rect x="86" y="206" width="30" height="42" rx="4" fill="url(#ss-item)" fill-opacity="0.8"/>
+    <rect x="124" y="206" width="30" height="42" rx="4" fill="url(#ss-item)" fill-opacity="0.8"/>
+    <rect x="162" y="206" width="30" height="42" rx="4" fill="url(#ss-item)" fill-opacity="0.8"/>
+    <rect x="238" y="206" width="30" height="42" rx="4" fill="url(#ss-item)" fill-opacity="0.8"/>
+    <rect x="276" y="206" width="30" height="42" rx="4" fill="url(#ss-item)" fill-opacity="0.8"/>
+    <rect x="314" y="206" width="20" height="42" rx="4" fill="url(#ss-item)" fill-opacity="0.8"/>
+    <rect x="200" y="206" width="30" height="42" rx="4" fill="none" stroke="#ff6b6b" stroke-opacity="0.8" stroke-dasharray="4 4"/>
+  </g>
+
+  <!-- AI scan node -->
+  <circle cx="210" cy="32" r="10" fill="#22D3EE"/>
+  <circle cx="210" cy="32" r="16" fill="none" stroke="#22D3EE" stroke-opacity="0.4" stroke-width="2"/>
+
+  <!-- moving scan beam -->
+  <rect x="70" y="55" width="280" height="6" fill="url(#ss-beam)">
+    <animate attributeName="y" values="58;249;58" dur="3.2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.9;1;0.9" dur="3.2s" repeatCount="indefinite"/>
+  </rect>
+</svg>

@@ -1,24 +1,20 @@
-<<<<<<< HEAD
 // Backend base URL. Override for phone/tunnel testing via frontend/.env.local:
 //   VITE_API_BASE_URL=https://your-backend-tunnel-url
+// If the env var is DEFINED but empty, calls are same-origin relative — which
+// lets the app work behind any tunnel via the dev server's backend proxy,
+// without knowing the tunnel URL in advance.
+const configuredBase = import.meta.env.VITE_API_BASE_URL;
 export const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
-=======
-export async function detectShelfImage(file){
->>>>>>> 67a7ea4 (Implement detection improvements and UI updates)
+    configuredBase === undefined ? "http://127.0.0.1:8000" : configuredBase;
 
- const formData = new FormData();
- formData.append("file",file);
+export async function detectShelfImage(file) {
+    if (!file) {
+        throw new Error("No image selected");
+    }
 
- const response = await fetch(
-   "http://127.0.0.1:8000/detect",
-   {
-     method:"POST",
-     body:formData
-   }
- );
+    const formData = new FormData();
+    formData.append("file", file);
 
-<<<<<<< HEAD
     let response;
     try {
         response = await fetch(`${API_BASE_URL}/detect`, {
@@ -41,11 +37,3 @@ export async function detectShelfImage(file){
 
     return await response.json();
 }
-=======
- if(!response.ok){
-   throw new Error("Detection failed");
- }
-
- return await response.json();
-}
->>>>>>> 67a7ea4 (Implement detection improvements and UI updates)

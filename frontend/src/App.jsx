@@ -2,12 +2,7 @@ import { useEffect, useState } from "react";
 import "./App.css";
 import LiveCameraMonitor from "./components/LiveCameraMonitor";
 import DetectionUpload from "./components/DetectionUpload";
-<<<<<<< HEAD
 import { API_BASE_URL } from "./services/detectionApi";
-=======
-
-const API_BASE_URL = "http://127.0.0.1:8001";
->>>>>>> 67a7ea4 (Implement detection improvements and UI updates)
 
 export default function App() {
   const [connected, setConnected] = useState(null);
@@ -24,6 +19,9 @@ export default function App() {
   };
 
   useEffect(() => {
+    // checkBackend only calls setState after an awaited fetch (async), so it
+    // is not a synchronous setState-in-effect; this primes status before poll.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     checkBackend();
 
     const interval = setInterval(() => {

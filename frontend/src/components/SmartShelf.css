@@ -1,0 +1,25 @@
+/* Smart-shelf hero illustration used on the landing page. */
+.smart-shelf {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.smart-shelf img {
+  width: 420px;
+  max-width: 80vw;
+  height: auto;
+  border-radius: 22px;
+  filter: drop-shadow(0 18px 45px rgba(34, 211, 238, 0.28));
+  animation: smartShelfFloat 6s ease-in-out infinite;
+}
+
+@keyframes smartShelfFloat {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .smart-shelf img { animation: none; }
+}
