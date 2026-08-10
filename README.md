@@ -4,7 +4,7 @@ An AI-based smart retail monitoring system that watches store shelves and flags 
 
 ## Description
 
-StoreVision AI analyzes shelf data to keep retail displays accurate and well-stocked. It detects missing shelf items, wrong product placement, expired products, near-expiry products, items kept on shelves too long, and suspicious product movement — helping store staff act before issues affect customers.
+StoreVision AI watches store shelves with computer vision. It detects empty shelf space with a trained YOLO model and compares each camera scan against a saved reference layout to flag areas that look missing, moved, or changed — helping store staff act before issues affect customers.
 
 ## Current Status
 
@@ -13,15 +13,14 @@ StoreVision AI analyzes shelf data to keep retail displays accurate and well-sto
 spaces on test images. Model weights, training outputs, and dataset files stay
 local and Git-ignored. The backend + frontend MVP remains stable.
 
-- ✅ FastAPI backend with product data, shelf layout, and alert engine
-- ✅ React + Vite dashboard connected to the backend
-- ✅ All 5 alert types working from real logic (no fake/test data)
+- ✅ FastAPI backend with YOLO empty-shelf detection (`/detect`)
+- ✅ React + Vite frontend with live camera monitoring
+- ✅ Reference-image change detection (missing / moved / changed areas)
 - ✅ Dataset structure + collection plan ready ([dataset/DATASET_PLAN.md](dataset/DATASET_PLAN.md))
 - ✅ First labelled dataset added locally ([dataset/ROBOFLOW_DATASET_SOURCE.md](dataset/ROBOFLOW_DATASET_SOURCE.md))
 - ✅ YOLO config + training/detection scripts prepared ([ai-model/](ai-model/))
 - ✅ First empty-shelf model trained + detection tested (local)
-- ⬜ Own 5-product image collection + labelling (upcoming)
-- ⬜ Real camera / image input (upcoming)
+- ⬜ Real camera / image input tuning (ongoing)
 
 ### Day 14
 
@@ -50,19 +49,16 @@ Final training metrics (20 epochs, empty-shelf validation set):
 
 ## Features
 
-- **Missing item detection** — identify empty or under-stocked shelf slots.
-- **Wrong placement detection** — flag products that are not in their assigned slot.
-- **Expired product detection** — surface products past their expiry date.
-- **Near-expiry detection** — warn about products expiring within 7 days.
-- **Old stock / dwell-time monitoring** — detect items kept on a shelf too long.
-- **Suspicious movement detection** — spot unusual product movement (planned).
+- **Empty-shelf detection** — a YOLO model locates empty / under-stocked space on the shelf.
+- **Reference-image change detection** — save a reference photo of the correct layout, then flag areas that look missing, moved, or changed on later scans.
+- **Live camera monitoring** — scan continuously from a phone or webcam.
 
 ## Tech Stack
 
 - **Backend:** FastAPI, Uvicorn
 - **Frontend:** React, Vite
-- **AI / Computer Vision (upcoming):** Python, PyTorch, Ultralytics (YOLO), OpenCV, NumPy
-- **Data:** static demo data now; raw + labelled images for model training later
+- **AI / Computer Vision:** Python, PyTorch, Ultralytics (YOLO), OpenCV, NumPy
+- **Data:** raw + labelled shelf images for model training (local, Git-ignored)
 
 ## Project Structure
 
@@ -74,16 +70,14 @@ storevision-ai/
 │   └── requirements.txt
 ├── backend/                  # FastAPI service
 │   ├── app/
-│   │   ├── main.py           # App, routes, product + shelf data
-│   │   ├── data.py           # Demo product + shelf data
-│   │   ├── shelf.py          # Shelf layout (source of truth)
-│   │   ├── detection_data.py # Simulated detection scenarios
-│   │   └── detection_logic.py# Alert generation logic
+│   │   ├── main.py               # App + routes (health, empty-shelf /detect)
+│   │   ├── detection_service.py  # YOLO empty-shelf detection
+│   │   └── ai_service.py         # Inference helper
 │   └── requirements.txt
-├── frontend/                 # React + Vite dashboard
+├── frontend/                 # React + Vite app
 │   └── src/
-│       ├── App.jsx           # Dashboard UI
-│       └── components/
+│       ├── App.jsx           # App UI
+│       └── components/       # Live camera monitor, etc.
 ├── dataset/
 │   ├── raw-images/
 │   └── labelled-data/
@@ -111,7 +105,7 @@ npm install
 npm run dev
 ```
 
-Dashboard available at `http://localhost:5173` (or the next free port).
+App available at `http://localhost:5173` (or the next free port).
 
 > **Note (Windows + antivirus/proxy):** if `npm install` fails with
 > `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, run it once as
@@ -120,32 +114,15 @@ Dashboard available at `http://localhost:5173` (or the next free port).
 
 ## API Routes
 
-| Method | Route             | Description                                  |
-| ------ | ----------------- | -------------------------------------------- |
-| GET    | `/`               | Backend running message                      |
-| GET    | `/health`         | Health / status check                        |
-| GET    | `/products`       | List of demo products                        |
-| GET    | `/shelf-layout`   | Expected product for each shelf slot         |
-| GET    | `/alerts`         | Live alerts from the detection engine        |
-| GET    | `/alerts/normal`  | Debug: alerts for a normal shelf             |
-| GET    | `/alerts/missing` | Debug: alerts for a missing-item scenario    |
-| GET    | `/alerts/wrong`   | Debug: alerts for a wrong-placement scenario |
-| GET    | `/docs`           | Interactive Swagger API docs                 |
+| Method | Route      | Description                                |
+| ------ | ---------- | ------------------------------------------ |
+| GET    | `/`        | Backend running message                    |
+| GET    | `/health`  | Health / status check                      |
+| POST   | `/detect`  | Empty-shelf detection on an uploaded image |
+| GET    | `/docs`    | Interactive Swagger API docs               |
 
-## Alert Types
+## Next Steps
 
-| Type              | Severity | Trigger                                 |
-| ----------------- | -------- | --------------------------------------- |
-| `missing_item`    | high     | Expected product not detected in a slot |
-| `wrong_placement` | medium   | A different product is in the slot      |
-| `expired_product` | critical | Product past its expiry date            |
-| `near_expiry`     | low      | Product expires within 7 days           |
-| `old_stock`       | low      | Product on shelf longer than 10 days    |
-
-## Next Steps (Day 11 onward)
-
-1. Collect and organize a dataset of shelf/product images.
-2. Label the images for the 5 demo products.
-3. Train a YOLO object detection model.
-4. Replace the simulated detection data with real model output.
-5. Feed detections into the existing alert engine.
+1. Expand the labelled dataset and retrain for better empty-shelf accuracy.
+2. Tune the reference-image change detection on real shelves.
+3. Improve live camera capture and mobile UX.

@@ -18,7 +18,7 @@ const https =
 const backend = process.env.VITE_PROXY_BACKEND; // e.g. http://localhost:8000
 const proxy = backend
   ? Object.fromEntries(
-      ["/detect", "/health", "/upload-image", "/results", "/smart-suggestions"].map(
+      ["/detect", "/health"].map(
         (p) => [p, { target: backend, changeOrigin: true, secure: false }]
       )
     )
