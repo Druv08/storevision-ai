@@ -21,6 +21,45 @@ import IssueReviewPanel from "./IssueReviewPanel";
 
 const SHOW_REGIONS_DEFAULT = true;
 
+// One report section of alert cards (presentation only). Kept tiny so the heavy
+// image logic stays in referenceImageAnalysis.js.
+function AlertSection({
+  title,
+  badge,
+  badgeClass,
+  cardClass,
+  alerts,
+  emptyText,
+  scoreLabel = "Confidence",
+  hidden,
+}) {
+  return (
+    <>
+      <h3>{title}</h3>
+      {hidden ? (
+        <p className="zone-note">Hidden — re-set the reference layout first.</p>
+      ) : alerts.length > 0 ? (
+        <div className="suggestions-grid book-alert-list">
+          {alerts.map((region) => (
+            <div key={region.id} className={`suggestion-card ${cardClass}`}>
+              <span className={`priority-badge ${badgeClass}`}>{badge}</span>
+              <h3>
+                {region.id} — {region.areaLabel} area
+              </h3>
+              <p className="suggestion-action">{region.message}</p>
+              <p className="alert-confidence">
+                {scoreLabel}: {Math.round(region.confidence * 100)}%
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="safe">{emptyText}</p>
+      )}
+    </>
+  );
+}
+
 export default function LiveCameraMonitor() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -71,17 +110,27 @@ export default function LiveCameraMonitor() {
   // Region-level results for the latest scan (null until a reference is set).
   const regions = analysis?.regions ?? null;
   const referenceWarning = Boolean(analysis?.referenceMismatch);
-  const { missingAlerts, movedAlerts, changedAlerts } = buildReferenceAlerts(
-    analysis
-  );
+  const {
+    emptySpaceAlerts,
+    missingAlerts,
+    movedAlerts,
+    swapAlerts,
+    addedAlerts,
+    changedAlerts,
+  } = buildReferenceAlerts(analysis);
 
   // Affected areas: strong statuses only. Nothing during a mismatch.
+  // (missingAlerts already includes empty spaces, so they are not double-added.)
   const affectedAreas = regions
     ? referenceWarning
       ? []
-      : [...missingAlerts, ...movedAlerts, ...changedAlerts].map(
-          (r) => r.areaLabel
-        )
+      : [
+          ...missingAlerts,
+          ...addedAlerts,
+          ...movedAlerts,
+          ...swapAlerts,
+          ...changedAlerts,
+        ].map((r) => r.areaLabel)
     : [];
   const uniqueAffectedAreas = [...new Set(affectedAreas)];
 
@@ -320,8 +369,9 @@ export default function LiveCameraMonitor() {
     <div className="glass-panel">
       <h2>Live Shelf Monitor</h2>
       <p className="monitor-subtitle">
-        Save a reference photo of the correct layout, then scan to find
-        missing or moved objects.
+        Save a reference photo of the correct layout, then scan to find empty
+        spaces, missing, moved, swapped, or newly added objects — for any shelf,
+        desk, or rack. No fixed boxes, no item names.
       </p>
 
       {/* CONTROLS */}
@@ -409,6 +459,13 @@ export default function LiveCameraMonitor() {
           camera in the same position for later scans.
         </p>
       )}
+
+      {/* REAL-STORE INSTRUCTIONS (keep phone angle stable) */}
+      <p className="reference-instructions">
+        📌 Set the reference from the same camera angle before scanning. Keep the
+        phone steady and the angle stable. If the whole layout changes too much,
+        re-set the reference layout.
+      </p>
 
       {/* MONITORING STATUS */}
       <div className="status-grid">
@@ -565,10 +622,19 @@ export default function LiveCameraMonitor() {
                     <b>{Math.round(analysis.changedFraction * 100)}%</b>
                   </p>
                   <p>
+                    Empty spaces: <b>{emptySpaceAlerts.length}</b>
+                  </p>
+                  <p>
                     Possible missing objects: <b>{missingAlerts.length}</b>
                   </p>
                   <p>
-                    Possible moved/replaced: <b>{movedAlerts.length}</b>
+                    Added / new objects: <b>{addedAlerts.length}</b>
+                  </p>
+                  <p>
+                    Possible moved: <b>{movedAlerts.length}</b>
+                  </p>
+                  <p>
+                    Possible swaps: <b>{swapAlerts.length}</b>
                   </p>
                   <p>
                     Changed areas needing review: <b>{changedAlerts.length}</b>
@@ -629,77 +695,57 @@ export default function LiveCameraMonitor() {
                   </p>
                 )}
 
-                <h3>Possible Missing Object Alerts</h3>
+                <AlertSection
+                  title="Empty Space Alerts"
+                  badge="EMPTY SPACE"
+                  badgeClass="badge-high"
+                  cardClass="priority-high"
+                  alerts={emptySpaceAlerts}
+                  emptyText="No empty-space alerts from the latest scan."
+                  hidden={referenceWarning}
+                />
 
-                {referenceWarning ? (
-                  <p className="zone-note">
-                    Hidden — re-set the reference layout first.
-                  </p>
-                ) : missingAlerts.length > 0 ? (
-                  <div className="suggestions-grid book-alert-list">
-                    {missingAlerts.map((region) => (
-                      <div
-                        key={region.id}
-                        className="suggestion-card priority-high"
-                      >
-                        <span className="priority-badge badge-high">
-                          POSSIBLE MISSING OBJECT
-                        </span>
+                <AlertSection
+                  title="Possible Missing Object Alerts"
+                  badge="POSSIBLE MISSING OBJECT"
+                  badgeClass="badge-high"
+                  cardClass="priority-high"
+                  alerts={missingAlerts}
+                  emptyText="No missing object alerts from the latest scan."
+                  hidden={referenceWarning}
+                />
 
-                        <h3>
-                          {region.id} — {region.areaLabel} area
-                        </h3>
+                <AlertSection
+                  title="Added / New Object Alerts"
+                  badge="ADDED OBJECT"
+                  badgeClass="badge-added"
+                  cardClass="added-item"
+                  alerts={addedAlerts}
+                  emptyText="No added-object alerts from the latest scan."
+                  hidden={referenceWarning}
+                />
 
-                        <p className="suggestion-action">{region.message}</p>
+                <AlertSection
+                  title="Possible Moved Object Alerts"
+                  badge="POSSIBLE MOVED OBJECT"
+                  badgeClass="badge-wrong"
+                  cardClass="wrong-item"
+                  alerts={movedAlerts}
+                  emptyText="No moved-object alerts from the latest scan."
+                  scoreLabel="Match score"
+                  hidden={referenceWarning}
+                />
 
-                        <p className="alert-confidence">
-                          Confidence: {Math.round(region.confidence * 100)}%
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="safe">
-                    No missing object alerts from the latest scan.
-                  </p>
-                )}
-
-                <h3>Possible Moved/Replaced Object Alerts</h3>
-
-                {referenceWarning ? (
-                  <p className="zone-note">
-                    Hidden — re-set the reference layout first.
-                  </p>
-                ) : movedAlerts.length > 0 ? (
-                  <div className="suggestions-grid book-alert-list">
-                    {movedAlerts.map((region) => (
-                      <div
-                        key={region.id}
-                        className="suggestion-card wrong-item"
-                      >
-                        <span className="priority-badge badge-wrong">
-                          {region.status === "swapped"
-                            ? "POSSIBLE SWAP"
-                            : "POSSIBLE MOVED OBJECT"}
-                        </span>
-
-                        <h3>
-                          {region.id} — {region.areaLabel} area
-                        </h3>
-
-                        <p className="suggestion-action">{region.message}</p>
-
-                        <p className="alert-confidence">
-                          Match score: {Math.round(region.confidence * 100)}%
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="safe">
-                    No moved/replaced object alerts from the latest scan.
-                  </p>
-                )}
+                <AlertSection
+                  title="Possible Swap / Replacement Alerts"
+                  badge="POSSIBLE SWAP"
+                  badgeClass="badge-wrong"
+                  cardClass="wrong-item"
+                  alerts={swapAlerts}
+                  emptyText="No swap/replacement alerts from the latest scan."
+                  scoreLabel="Match score"
+                  hidden={referenceWarning}
+                />
 
                 <h3>Recent Shelf Events</h3>
 
@@ -737,9 +783,9 @@ export default function LiveCameraMonitor() {
                         <tr>
                           <th>Region</th>
                           <th>Area</th>
-                          <th>Status</th>
-                          <th>Looks like area</th>
-                          <th>Score</th>
+                          <th>Change type</th>
+                          <th>Confidence</th>
+                          <th>Message</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -751,8 +797,8 @@ export default function LiveCameraMonitor() {
                             <td>{region.id}</td>
                             <td>{region.areaLabel}</td>
                             <td>{region.statusLabel}</td>
-                            <td>{region.matchedAreaLabel || "—"}</td>
                             <td>{Math.round(region.confidence * 100)}%</td>
+                            <td>{region.message}</td>
                           </tr>
                         ))}
                       </tbody>

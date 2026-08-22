@@ -10,7 +10,9 @@
 // of the reference layout ("lower-right", "center-left").
 
 export const ISSUE_TYPE_LABELS = {
+  empty_space: "Empty space",
   missing: "Possible missing object",
+  added: "Added / new object",
   moved: "Possible moved object",
   swapped: "Possible swap",
   changed: "Changed area",
@@ -28,9 +30,13 @@ export const ISSUE_STATUS_LABELS = {
 const ACTIVE_STATUSES = ["new", "reviewing"];
 
 // An active issue of any of these types covers a region status, so the same
-// physical problem is not reported twice under two names.
+// physical problem is not reported twice under two names. An empty space and a
+// possible missing object describe the same gap, so they cover each other -
+// a removed object creates ONE issue, not two.
 const COVERING_TYPES = {
-  missing: ["missing", "suspicious_removal"],
+  empty_space: ["empty_space", "missing", "suspicious_removal"],
+  missing: ["empty_space", "missing", "suspicious_removal"],
+  added: ["added"],
   moved: ["moved", "swapped"],
   swapped: ["moved", "swapped"],
   changed: ["changed"],
@@ -39,9 +45,10 @@ const COVERING_TYPES = {
 const MAX_ISSUES = 200; // keep localStorage small
 
 export function severityForType(type) {
-  if (type === "missing" || type === "suspicious_removal") return "high";
+  if (type === "empty_space" || type === "missing" || type === "suspicious_removal")
+    return "high";
   if (type === "moved" || type === "swapped") return "medium";
-  if (type === "changed") return "medium";
+  if (type === "added" || type === "changed") return "medium";
   return "low"; // restored / informational
 }
 
@@ -159,7 +166,8 @@ export function updateIssueStatus(issues, id, status) {
 // Summary counts for the dashboard cards.
 export function computeIssueStats(issues) {
   const today = new Date().toDateString();
-  const isMissingType = (t) => t === "missing" || t === "suspicious_removal";
+  const isMissingType = (t) =>
+    t === "empty_space" || t === "missing" || t === "suspicious_removal";
   const isMovedType = (t) => t === "moved" || t === "swapped";
 
   return {
@@ -171,6 +179,7 @@ export function computeIssueStats(issues) {
     resolvedCount: issues.filter((i) => i.status === "resolved").length,
     missingCount: issues.filter((i) => isMissingType(i.type)).length,
     movedCount: issues.filter((i) => isMovedType(i.type)).length,
+    addedCount: issues.filter((i) => i.type === "added").length,
     changedCount: issues.filter((i) => i.type === "changed").length,
   };
 }

@@ -1518,3 +1518,56 @@ tbody tr:hover {
         flex:1 1 45%;
     }
 }
+
+/* =========================
+   REFERENCE ANALYSIS — EXTRA STATES
+   (empty space, added object, real-store instructions)
+========================= */
+
+.reference-instructions {
+    text-align:center;
+    color:var(--ice);
+    font-size:13px;
+    line-height:1.5;
+    margin:0 auto 18px;
+    max-width:640px;
+    padding:10px 14px;
+    border-radius:12px;
+    background:rgba(56,189,248,.10);
+    border:1px solid rgba(56,189,248,.35);
+}
+
+/* Empty-space region overlay (a confirmed gap) — red, like missing. */
+.region-box.region-empty_space {
+    border-color:rgba(255,107,107,.9);
+    background:rgba(255,107,107,.12);
+}
+
+/* Added-object region overlay — green (something new appeared). */
+.region-box.region-added {
+    border-color:rgba(74,222,128,.9);
+    background:rgba(74,222,128,.12);
+}
+
+/* Added-object alert card + badge. */
+.suggestion-card.added-item {
+    border-left-color:#4ade80;
+}
+
+.badge-added {
+    background:rgba(74,222,128,.18);
+    color:#4ade80;
+}
+
+/* Analysis-table row tints for the new change types. */
+.zone-row-empty_space td {
+    color:#ff6b6b;
+}
+
+.zone-row-added td {
+    color:#4ade80;
+}
+
+/* Issue-panel type badges for the new types. */
+.issue-type-empty_space { background:rgba(255,107,107,.2); color:#ff6b6b; }
+.issue-type-added { background:rgba(74,222,128,.18); color:#4ade80; }

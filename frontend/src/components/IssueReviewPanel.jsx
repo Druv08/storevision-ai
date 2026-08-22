@@ -12,8 +12,9 @@ const FILTERS = [
   { id: "reviewing", label: "Reviewing" },
   { id: "resolved", label: "Resolved" },
   { id: "false_alarm", label: "False Alarm" },
-  { id: "missing", label: "Missing" },
+  { id: "missing", label: "Missing/Empty" },
   { id: "moved", label: "Moved/Swapped" },
+  { id: "added", label: "Added" },
   { id: "changed", label: "Changed" },
 ];
 
@@ -27,9 +28,15 @@ function matchesFilter(issue, filter) {
     case "false_alarm":
       return issue.status === filter;
     case "missing":
-      return issue.type === "missing" || issue.type === "suspicious_removal";
+      return (
+        issue.type === "empty_space" ||
+        issue.type === "missing" ||
+        issue.type === "suspicious_removal"
+      );
     case "moved":
       return issue.type === "moved" || issue.type === "swapped";
+    case "added":
+      return issue.type === "added";
     case "changed":
       return issue.type === "changed";
     default:

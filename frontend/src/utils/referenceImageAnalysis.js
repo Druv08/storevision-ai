@@ -1,52 +1,68 @@
-// Reference-image based shelf/desk monitoring.
+// Reference-image based shelf/desk/rack monitoring.
 //
-// No fixed grid, no planogram: the user captures ONE reference photo of the
-// correct layout, and every later scan is compared against it as a whole.
-// Changed areas are found with an image difference map, grouped into dynamic
-// regions, and each region is classified as missing / moved / swapped /
-// changed. Object names are never claimed - the system reports areas
-// ("lower-right", "center-left"), not item titles.
+// No fixed grid, no planogram, no A1-C5, no item names. The user captures ONE
+// reference photo of a correct layout; every later scan is compared against it
+// as a whole. Changed areas are found with a brightness-normalised difference
+// map, grouped into dynamic regions, and each region is classified as:
+//   empty_space / missing / added / moved / swapped / changed
+// The system reports generic AREAS ("lower-right", "center-left"), never object
+// titles. YOLO empty-space detections are supporting evidence only.
 //
-// YOLO empty-space detections are supporting evidence only.
+// Pipeline (each step is an exported, testable function):
+//   captureReferenceAnalysis(canvas)                  -> reference signature
+//   buildDifferenceMap(refImage, curImage)            -> thresholded diff mask
+//   findChangedRegions(diffMap)                        -> merged changed blobs
+//   classifyChangedRegion(blob, ref, cur, yolo, ...)   -> one region + status
+//   detectMovedOrSwappedObjects(regions)               -> moved / swapped pass
+//   analyzeCurrentAgainstReference(ref, canvas, yolo)  -> full result for the UI
+//   buildReferenceAlerts(result)                       -> grouped alert arrays
 
 // ---- Analysis geometry -------------------------------------------------------
 // Frames are downsampled to this working size before comparison. Small enough
 // to store in localStorage and diff quickly, big enough to see objects.
-const ANALYSIS_WIDTH = 96;
-const ANALYSIS_HEIGHT = 72;
+export const ANALYSIS_WIDTH = 96;
+export const ANALYSIS_HEIGHT = 72;
 
 // ---- Tuning thresholds (tune here) -------------------------------------------
-const PIXEL_DIFF_THRESHOLD = 26; // 0-255 gray difference after brightness normalisation
-const MIN_REGION_FRACTION = 0.004; // ignore changed specks smaller than this share of the frame
-const REGION_MERGE_GAP = 7; // changed blobs closer than this (analysis px) merge into one region
+export const DIFF_THRESHOLD = 26; // 0-255 gray difference after brightness normalisation
+export const CHROMA_THRESHOLD = 45; // colour (hue) change even when brightness is unchanged
+export const MIN_REGION_AREA = 0.004; // ignore changed specks smaller than this share of the frame
+export const MERGE_DISTANCE = 7; // changed blobs closer than this (analysis px) merge into one region
 // (a removed object often fragments into strips where its brightness matched
 // the background - the gap must be big enough to re-join them)
+export const CAMERA_MISMATCH_THRESHOLD = 0.45; // >45% of frame changed = camera/reference mismatch
+export const MISSING_CONFIDENCE_THRESHOLD = 0.5; // below this an empty/missing region is treated as "changed"
+export const MOVED_CONFIDENCE_THRESHOLD = 0.55; // below this a moved match is downgraded to "changed"
+
 const MAX_REGIONS = 12; // more simultaneous regions than this = unreliable scan
 
-const MISMATCH_CHANGED_FRACTION = 0.45; // >45% of frame changed = camera/reference mismatch
+// "Looks empty now" signals for missing/empty-space detection.
+const EMPTY_TEXTURE_RATIO = 0.7; // current texture (edges) dropped to <70% of the reference crop
+const EMPTY_VARIANCE_RATIO = 0.7; // current contrast dropped to <70% of the reference crop
+const EMPTY_ABS_EDGE = 10; // an absolutely flat area on the analysis image (shelf/background)
+const YOLO_SUPPORT_OVERLAP = 0.3; // a YOLO box covering 30%+ of a region supports "empty space"
 
-// "Looks empty now" signals for missing detection.
-const EMPTY_TEXTURE_RATIO = 0.7; // texture drop vs the reference crop
-const EMPTY_VARIANCE_RATIO = 0.7; // contrast drop vs the reference crop
-const EMPTY_ABS_EDGE = 10; // an absolutely flat area on the analysis image
-const YOLO_SUPPORT_OVERLAP = 0.3; // YOLO box covering 30%+ of a region supports "missing"
+// "Looks like a new object now" signals for added detection (inverse of empty).
+const ADDED_REF_FLAT_EDGE = 15; // reference crop was near-background (few edges)
+const ADDED_TEXTURE_GAIN = 1 / EMPTY_TEXTURE_RATIO; // current has clearly more texture than the reference
 
-// Moved/swap matching: the current content of one region must clearly match
-// the REFERENCE content of another region.
-const MATCH_DIFF_MAX = 0.26;
-const MATCH_ADVANTAGE = 0.8; // ...and match it better than its own reference
+// Moved/swap matching: the current content of one region must clearly match the
+// REFERENCE content of another region (position-independent signatures).
+const MATCH_DIFF_MAX = 0.26; // best cross-region content difference must be under this
+const MATCH_ADVANTAGE = 0.8; // ...and beat its own reference difference by this factor
 
 const HIST_BINS = 4; // per RGB channel -> 64 color buckets per region
 
 export const REGION_STATUS_LABELS = {
+  empty_space: "Empty space",
   missing: "Possible missing object",
+  added: "Added / new object",
   moved: "Possible moved object",
-  swapped: "Possible swap",
+  swapped: "Possible swap / replacement",
   changed: "Changed area",
 };
 
 // ---- YOLO display pipeline (boxes drawn over the captured frame) -------------
-// Same values chosen in the Day 18/19 threshold tests.
 export const DISPLAY_CONFIDENCE_THRESHOLD = 0.35; // hide weak/noisy boxes
 const IOU_SUPPRESSION_THRESHOLD = 0.4; // overlapping boxes above this are duplicates
 
@@ -154,7 +170,7 @@ export function buildDisplayDetections(rawDetections) {
   return mergeNearbyDetections(removeDuplicateDetections(confident));
 }
 
-// ---- Frame signatures ----------------------------------------------------------
+// ---- Frame signatures --------------------------------------------------------
 
 // Downsample a full frame from a canvas into a compact comparable image.
 export function downsampleCanvas(sourceCanvas) {
@@ -184,8 +200,9 @@ export function imageFromRgba(data, width, height) {
   return { width, height, gray, rgb };
 }
 
-// Capture the reference layout from the camera canvas.
-export function captureReferenceSignature(referenceCanvas) {
+// Capture the reference layout signature from the camera canvas.
+// Stores a downsampled comparable image only - never the real photo file.
+export function captureReferenceAnalysis(referenceCanvas) {
   return {
     savedAt: new Date().toLocaleTimeString([], {
       hour: "2-digit",
@@ -195,18 +212,28 @@ export function captureReferenceSignature(referenceCanvas) {
     image: downsampleCanvas(referenceCanvas),
   };
 }
+// Backward-compatible alias.
+export const captureReferenceSignature = captureReferenceAnalysis;
 
-// ---- Region helpers --------------------------------------------------------------
+// ---- Region helpers ----------------------------------------------------------
 
-// Human-readable location of a normalized box: "upper-left" ... "lower-right".
-export function areaLabelForBox(box) {
-  const cx = (box.x1 + box.x2) / 2;
-  const cy = (box.y1 + box.y2) / 2;
+// Human-readable location of a box: "upper-left" ... "lower-right".
+// Accepts a normalized box (0..1); if imageWidth/Height are given and the box
+// is in pixels, it is normalized first.
+export function getAreaLabel(box, imageWidth = 1, imageHeight = 1) {
+  const nx1 = imageWidth > 1 ? box.x1 / imageWidth : box.x1;
+  const nx2 = imageWidth > 1 ? box.x2 / imageWidth : box.x2;
+  const ny1 = imageHeight > 1 ? box.y1 / imageHeight : box.y1;
+  const ny2 = imageHeight > 1 ? box.y2 / imageHeight : box.y2;
+  const cx = (nx1 + nx2) / 2;
+  const cy = (ny1 + ny2) / 2;
   const col = cx < 1 / 3 ? "left" : cx < 2 / 3 ? "center" : "right";
   const row = cy < 1 / 3 ? "upper" : cy < 2 / 3 ? "center" : "lower";
   if (row === "center" && col === "center") return "center";
   return `${row}-${col}`;
 }
+// Backward-compatible alias.
+export const areaLabelForBox = getAreaLabel;
 
 // Stats of one rectangular crop of a comparable image (pixel coordinates).
 function computeRegionStats(image, px) {
@@ -295,33 +322,75 @@ function contentDifference(a, b) {
   return 0.6 * histDiff + 0.25 * colorDiff + 0.15 * edgeDiff;
 }
 
-// ---- Change detection --------------------------------------------------------------
+// ---- Change detection --------------------------------------------------------
 
-// Difference map + connected components => changed regions with pixel bboxes.
-// Brightness-normalised, small specks dropped, nearby blobs merged.
-export function detectChangedRegions(referenceImage, currentImage) {
+// Colour-aware, thresholded difference mask between two comparable images.
+// A pixel is "changed" if its brightness OR its colour (hue) changed enough.
+// Lighting tolerance: each frame's mean is subtracted from both the luminance
+// and the two colour-opponent channels, so a uniform brightness change or a
+// global colour cast does not light up the whole frame. Using colour (not just
+// grayscale) means two objects of similar brightness but different colour - a
+// swap - are still detected.
+export function buildDifferenceMap(referenceImage, currentImage) {
   const { width, height } = referenceImage;
   const total = width * height;
 
-  const refMean =
-    referenceImage.gray.reduce((s, v) => s + v, 0) / Math.max(total, 1);
-  const curMean =
-    currentImage.gray.reduce((s, v) => s + v, 0) / Math.max(total, 1);
+  // Colour-opponent signals (luminance-independent): red-green and yellow-blue.
+  const opponents = (image) => {
+    const rg = new Float32Array(total);
+    const yb = new Float32Array(total);
+    let graySum = 0, rgSum = 0, ybSum = 0;
+    for (let i = 0; i < total; i++) {
+      const r = image.rgb[i * 3];
+      const g = image.rgb[i * 3 + 1];
+      const b = image.rgb[i * 3 + 2];
+      rg[i] = r - g;
+      yb[i] = (r + g) / 2 - b;
+      graySum += image.gray[i];
+      rgSum += rg[i];
+      ybSum += yb[i];
+    }
+    return {
+      rg,
+      yb,
+      grayMean: graySum / Math.max(total, 1),
+      rgMean: rgSum / Math.max(total, 1),
+      ybMean: ybSum / Math.max(total, 1),
+    };
+  };
+
+  const ref = opponents(referenceImage);
+  const cur = opponents(currentImage);
 
   const changed = new Uint8Array(total);
   let changedCount = 0;
   for (let i = 0; i < total; i++) {
-    const d = Math.abs(
-      currentImage.gray[i] - curMean - (referenceImage.gray[i] - refMean)
+    const grayDiff = Math.abs(
+      currentImage.gray[i] - cur.grayMean - (referenceImage.gray[i] - ref.grayMean)
     );
-    if (d > PIXEL_DIFF_THRESHOLD) {
+    const chromaDiff =
+      Math.abs(cur.rg[i] - cur.rgMean - (ref.rg[i] - ref.rgMean)) +
+      Math.abs(cur.yb[i] - cur.ybMean - (ref.yb[i] - ref.ybMean));
+    if (grayDiff > DIFF_THRESHOLD || chromaDiff > CHROMA_THRESHOLD) {
       changed[i] = 1;
       changedCount++;
     }
   }
-  const changedFraction = changedCount / Math.max(total, 1);
 
-  // Connected components (8-connectivity BFS) over the changed mask.
+  return {
+    width,
+    height,
+    changed,
+    changedFraction: changedCount / Math.max(total, 1),
+  };
+}
+
+// Connected components (8-connectivity BFS) over a difference mask => changed
+// regions with pixel bboxes. Tiny specks dropped, nearby blobs merged.
+export function findChangedRegions(diffMap) {
+  const { width, height, changed, changedFraction } = diffMap;
+  const total = width * height;
+
   const visited = new Uint8Array(total);
   let blobs = [];
   for (let start = 0; start < total; start++) {
@@ -359,7 +428,7 @@ export function detectChangedRegions(referenceImage, currentImage) {
   }
 
   // Drop tiny noise blobs.
-  blobs = blobs.filter((b) => b.area >= MIN_REGION_FRACTION * total);
+  blobs = blobs.filter((b) => b.area >= MIN_REGION_AREA * total);
 
   // Merge blobs whose (slightly expanded) boxes touch, until stable.
   let mergedSomething = true;
@@ -370,10 +439,10 @@ export function detectChangedRegions(referenceImage, currentImage) {
         const a = blobs[i];
         const b = blobs[j];
         const touch =
-          a.x1 - REGION_MERGE_GAP < b.x2 &&
-          b.x1 - REGION_MERGE_GAP < a.x2 &&
-          a.y1 - REGION_MERGE_GAP < b.y2 &&
-          b.y1 - REGION_MERGE_GAP < a.y2;
+          a.x1 - MERGE_DISTANCE < b.x2 &&
+          b.x1 - MERGE_DISTANCE < a.x2 &&
+          a.y1 - MERGE_DISTANCE < b.y2 &&
+          b.y1 - MERGE_DISTANCE < a.y2;
         if (touch) {
           blobs[i] = {
             x1: Math.min(a.x1, b.x1),
@@ -396,7 +465,12 @@ export function detectChangedRegions(referenceImage, currentImage) {
   return { blobs, changedFraction };
 }
 
-// Fraction of a pixel-box covered by the strongest overlapping YOLO box
+// Backward-compatible one-shot: difference map + regions in a single call.
+export function detectChangedRegions(referenceImage, currentImage) {
+  return findChangedRegions(buildDifferenceMap(referenceImage, currentImage));
+}
+
+// Fraction of a normalized box covered by the strongest overlapping YOLO box
 // (YOLO boxes given in normalized 0..1 coordinates).
 function yoloOverlapForBox(normBox, yoloBoxes) {
   const area = (normBox.x2 - normBox.x1) * (normBox.y2 - normBox.y1);
@@ -411,11 +485,107 @@ function yoloOverlapForBox(normBox, yoloBoxes) {
   return maxCover;
 }
 
+// Classify ONE changed blob by comparing the same area in reference vs current.
+// Returns a region object with a first-pass status:
+//   empty_space | missing | added | changed
+// (moved / swapped are decided later across regions.)
+export function classifyChangedRegion(
+  blob,
+  referenceImage,
+  currentImage,
+  yoloBoxes = [],
+  index = 0,
+  changedFraction = 0
+) {
+  const { width, height } = referenceImage;
+  const normBox = {
+    x1: blob.x1 / width,
+    y1: blob.y1 / height,
+    x2: blob.x2 / width,
+    y2: blob.y2 / height,
+  };
+  const referenceStats = computeRegionStats(referenceImage, blob);
+  const currentStats = computeRegionStats(currentImage, blob);
+
+  const textureRatio =
+    currentStats.edgeScore / Math.max(referenceStats.edgeScore, 1e-6);
+  const varianceRatio =
+    currentStats.variance / Math.max(referenceStats.variance, 1e-6);
+  const yoloOverlap = yoloOverlapForBox(normBox, yoloBoxes);
+  const yoloSupport = yoloOverlap >= YOLO_SUPPORT_OVERLAP;
+
+  // Object gone: current area is much flatter/lower-texture than the reference.
+  // Texture drop is the main signal; a variance drop OR an absolutely flat
+  // current area confirms it (variance alone misleads when the reference
+  // object's colors share a similar brightness). YOLO gap boxes also support it.
+  const looksEmpty =
+    (textureRatio < EMPTY_TEXTURE_RATIO &&
+      (varianceRatio < EMPTY_VARIANCE_RATIO ||
+        currentStats.edgeScore < EMPTY_ABS_EDGE)) ||
+    (yoloSupport && textureRatio < 0.85);
+
+  // Object added: reference area was near-background (few edges) and the current
+  // area now has clearly more texture/detail. Inverse of "looks empty".
+  const looksAdded =
+    !looksEmpty &&
+    referenceStats.edgeScore < ADDED_REF_FLAT_EDGE &&
+    currentStats.edgeScore > EMPTY_ABS_EDGE &&
+    textureRatio > ADDED_TEXTURE_GAIN;
+
+  let status;
+  let confidence;
+  if (looksEmpty) {
+    // A clean physical gap (very flat now, or YOLO confirms) = empty_space;
+    // a softer "something is gone" = missing.
+    const cleanGap = yoloSupport || currentStats.edgeScore < EMPTY_ABS_EDGE;
+    status = cleanGap ? "empty_space" : "missing";
+    confidence = Math.min(
+      0.95,
+      0.5 + (1 - Math.min(textureRatio, 1)) * 0.3 + (yoloSupport ? 0.15 : 0)
+    );
+    // Weak empty signals are just "changed" (avoid false missing alerts).
+    if (confidence < MISSING_CONFIDENCE_THRESHOLD) {
+      status = "changed";
+    }
+  } else if (looksAdded) {
+    status = "added";
+    confidence = Math.min(
+      0.9,
+      0.5 + Math.min(1, (textureRatio - 1) / 2) * 0.3
+    );
+  } else {
+    status = "changed";
+    confidence = Math.min(
+      0.9,
+      0.4 + changedFraction + (1 - 1 / (1 + blob.area / 100))
+    );
+  }
+
+  return {
+    id: `Region ${index + 1}`,
+    box: normBox,
+    areaLabel: getAreaLabel(normBox),
+    status,
+    confidence,
+    textureRatio,
+    varianceRatio,
+    yoloSupport,
+    matchedRegionId: null,
+    matchedAreaLabel: null,
+    sourceAreaLabel: null,
+    destinationAreaLabel: null,
+    referenceStats,
+    currentStats,
+  };
+}
+
 // Moved/swap pass: does the CURRENT content of one changed region match the
 // REFERENCE content of another changed region? Mutual matches = swap.
 export function detectMovedOrSwappedObjects(regions) {
   for (const region of regions) {
-    if (region.status === "missing") continue;
+    // Empty/missing regions are move SOURCES (their object left), not
+    // destinations - skip them as candidates to reclassify.
+    if (region.status === "missing" || region.status === "empty_space") continue;
 
     let bestId = null;
     let bestDiff = Infinity;
@@ -434,9 +604,14 @@ export function detectMovedOrSwappedObjects(regions) {
       bestDiff < MATCH_DIFF_MAX &&
       bestDiff < ownDiff * MATCH_ADVANTAGE
     ) {
-      region.status = "moved";
-      region.matchedRegionId = bestId;
-      region.confidence = Math.min(0.95, 1 - bestDiff);
+      const confidence = Math.min(0.95, 1 - bestDiff);
+      // Only accept the move if the match is confident enough; otherwise the
+      // region stays whatever it was (usually "changed").
+      if (confidence >= MOVED_CONFIDENCE_THRESHOLD) {
+        region.status = "moved";
+        region.matchedRegionId = bestId;
+        region.confidence = confidence;
+      }
     }
   }
 
@@ -456,77 +631,37 @@ export function detectMovedOrSwappedObjects(regions) {
   return regions;
 }
 
-// Just the missing regions of an analysis (convenience per the spec).
+// Just the missing/empty regions of an analysis (convenience per the spec).
 export function detectMissingRegions(analysisRegions) {
-  return analysisRegions.filter((r) => r.status === "missing");
+  return analysisRegions.filter(
+    (r) => r.status === "missing" || r.status === "empty_space"
+  );
 }
 
-// ---- Main analysis ------------------------------------------------------------------
+// ---- Main analysis -----------------------------------------------------------
 
 // Pure core: compare two comparable images. Exported for headless testing.
 // yoloBoxes must be in NORMALIZED 0..1 frame coordinates.
 export function analyzeImagesAgainstReference(referenceImage, currentImage, yoloBoxes = []) {
-  const { width, height } = referenceImage;
-  const { blobs, changedFraction } = detectChangedRegions(
-    referenceImage,
-    currentImage
+  const diffMap = buildDifferenceMap(referenceImage, currentImage);
+  const { blobs, changedFraction } = findChangedRegions(diffMap);
+
+  // Whole-frame guard: too much changed at once = the camera or reference moved.
+  const referenceMismatch =
+    changedFraction > CAMERA_MISMATCH_THRESHOLD || blobs.length > MAX_REGIONS;
+
+  const regions = blobs.map((blob, index) =>
+    classifyChangedRegion(
+      blob,
+      referenceImage,
+      currentImage,
+      yoloBoxes,
+      index,
+      changedFraction
+    )
   );
 
-  const referenceMismatch =
-    changedFraction > MISMATCH_CHANGED_FRACTION || blobs.length > MAX_REGIONS;
-
-  const regions = blobs.map((blob, index) => {
-    const normBox = {
-      x1: blob.x1 / width,
-      y1: blob.y1 / height,
-      x2: blob.x2 / width,
-      y2: blob.y2 / height,
-    };
-    const referenceStats = computeRegionStats(referenceImage, blob);
-    const currentStats = computeRegionStats(currentImage, blob);
-
-    const textureRatio =
-      currentStats.edgeScore / Math.max(referenceStats.edgeScore, 1e-6);
-    const varianceRatio =
-      currentStats.variance / Math.max(referenceStats.variance, 1e-6);
-    const yoloOverlap = yoloOverlapForBox(normBox, yoloBoxes);
-    const yoloSupport = yoloOverlap >= YOLO_SUPPORT_OVERLAP;
-
-    // Texture drop is the main signal; a variance drop OR an absolutely
-    // flat current area confirms it (variance alone misleads when the
-    // reference object's colors share a similar brightness).
-    const looksEmpty =
-      (textureRatio < EMPTY_TEXTURE_RATIO &&
-        (varianceRatio < EMPTY_VARIANCE_RATIO ||
-          currentStats.edgeScore < EMPTY_ABS_EDGE)) ||
-      (yoloSupport && textureRatio < 0.85);
-
-    let status = looksEmpty ? "missing" : "changed";
-    let confidence;
-    if (status === "missing") {
-      confidence = Math.min(
-        0.95,
-        0.5 + (1 - Math.min(textureRatio, 1)) * 0.3 + (yoloSupport ? 0.15 : 0)
-      );
-    } else {
-      confidence = Math.min(0.9, 0.4 + changedFraction + (1 - 1 / (1 + blob.area / 100)));
-    }
-
-    return {
-      id: `Region ${index + 1}`,
-      box: normBox,
-      areaLabel: areaLabelForBox(normBox),
-      status,
-      confidence,
-      textureRatio,
-      varianceRatio,
-      yoloSupport,
-      matchedRegionId: null,
-      referenceStats,
-      currentStats,
-    };
-  });
-
+  // No move/swap reasoning during a mismatch (everything is unreliable then).
   if (!referenceMismatch) {
     detectMovedOrSwappedObjects(regions);
   }
@@ -535,9 +670,13 @@ export function analyzeImagesAgainstReference(referenceImage, currentImage, yolo
   const byId = Object.fromEntries(regions.map((r) => [r.id, r]));
   for (const region of regions) {
     region.statusLabel = REGION_STATUS_LABELS[region.status] || region.status;
-    region.matchedAreaLabel = region.matchedRegionId
-      ? byId[region.matchedRegionId]?.areaLabel ?? null
-      : null;
+    if (region.matchedRegionId) {
+      const matchedArea = byId[region.matchedRegionId]?.areaLabel ?? null;
+      region.matchedAreaLabel = matchedArea;
+      // For a moved object: it came FROM the matched reference area TO here.
+      region.sourceAreaLabel = matchedArea;
+      region.destinationAreaLabel = region.areaLabel;
+    }
     region.message = buildRegionMessage(region);
   }
 
@@ -566,30 +705,39 @@ export function analyzeCurrentAgainstReference(referenceData, currentCanvas, yol
 function buildRegionMessage(region) {
   const area = region.areaLabel;
   switch (region.status) {
+    case "empty_space":
+      return `Empty space detected in the ${area} area compared to the reference layout.`;
     case "missing":
-      return `Possible object missing — empty space detected in the ${area} area compared to the reference.`;
+      return `Possible object missing from the ${area} area compared to the reference.`;
+    case "added":
+      return `New object/change detected in the ${area} area (this area looked empty in the reference).`;
     case "moved":
-      return `Possible object movement — the ${area} area appears to contain an object from the ${region.matchedAreaLabel} area of the reference.`;
+      return `Possible object movement — the ${area} area appears to hold an object from the ${region.matchedAreaLabel} area of the reference.`;
     case "swapped":
-      return `Possible swap detected between the ${area} and ${region.matchedAreaLabel} areas.`;
+      return `Possible swap/replacement detected between the ${area} and ${region.matchedAreaLabel} areas.`;
     default:
       return `The ${area} area appears changed compared to the reference and needs review.`;
   }
 }
 
-// Group regions into the alert arrays the UI renders.
+// Group regions into the alert arrays the UI renders. Empty spaces are ALSO
+// surfaced as possible-missing (a gap is a possible missing object), but each
+// region still produces only ONE issue in the history (see issueHistory).
 export function buildReferenceAlerts(analysis) {
   const regions = analysis?.regions ?? [];
   return {
-    missingAlerts: regions.filter((r) => r.status === "missing"),
-    movedAlerts: regions.filter(
-      (r) => r.status === "moved" || r.status === "swapped"
+    emptySpaceAlerts: regions.filter((r) => r.status === "empty_space"),
+    missingAlerts: regions.filter(
+      (r) => r.status === "empty_space" || r.status === "missing"
     ),
+    movedAlerts: regions.filter((r) => r.status === "moved"),
+    swapAlerts: regions.filter((r) => r.status === "swapped"),
+    addedAlerts: regions.filter((r) => r.status === "added"),
     changedAlerts: regions.filter((r) => r.status === "changed"),
   };
 }
 
-// ---- Change-over-time events ----------------------------------------------------
+// ---- Change-over-time events -------------------------------------------------
 // Compare two consecutive stable analyses. Careful wording only.
 export function detectReferenceEvents(previousAnalysis, currentAnalysis) {
   if (!previousAnalysis || !currentAnalysis) return [];
@@ -598,6 +746,8 @@ export function detectReferenceEvents(previousAnalysis, currentAnalysis) {
   const prevKeys = new Set(previousAnalysis.regions.map(key));
   const prevAreas = new Set(previousAnalysis.regions.map((r) => r.areaLabel));
   const currAreas = new Set(currentAnalysis.regions.map((r) => r.areaLabel));
+
+  const isGone = (s) => s === "missing" || s === "empty_space";
 
   const time = new Date().toLocaleTimeString([], {
     hour: "2-digit",
@@ -608,12 +758,20 @@ export function detectReferenceEvents(previousAnalysis, currentAnalysis) {
   const events = [];
   for (const region of currentAnalysis.regions) {
     if (prevKeys.has(key(region))) continue;
-    if (region.status === "missing" && !prevAreas.has(region.areaLabel)) {
+    if (isGone(region.status) && !prevAreas.has(region.areaLabel)) {
       events.push({
         type: "removal",
         typeLabel: "Sudden removal",
         areaLabel: region.areaLabel,
         message: `Sudden shelf change — an object may have been removed from the ${region.areaLabel} area.`,
+        time,
+      });
+    } else if (region.status === "added" && !prevAreas.has(region.areaLabel)) {
+      events.push({
+        type: "added",
+        typeLabel: "Object added",
+        areaLabel: region.areaLabel,
+        message: `A new object/change appeared in the ${region.areaLabel} area.`,
         time,
       });
     } else if (
@@ -632,7 +790,7 @@ export function detectReferenceEvents(previousAnalysis, currentAnalysis) {
 
   // Areas that had a problem before and are clean now.
   for (const prev of previousAnalysis.regions) {
-    if (prev.status !== "missing") continue;
+    if (!isGone(prev.status)) continue;
     if (!currAreas.has(prev.areaLabel)) {
       events.push({
         type: "restored",
@@ -647,7 +805,7 @@ export function detectReferenceEvents(previousAnalysis, currentAnalysis) {
   return events;
 }
 
-// ---- Reference persistence (survives a page refresh) -----------------------------
+// ---- Reference persistence (survives a page refresh) -------------------------
 
 const REFERENCE_STORAGE_KEY = "storevision-reference-image";
 const REFERENCE_VERSION = 1;
